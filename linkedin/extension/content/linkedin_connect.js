@@ -14,16 +14,22 @@ function findSendWithoutNoteButton(scope = document) {
   const root = scope || document;
   const selectors = [
     'button[aria-label="Send without a note"]',
+    '[aria-label="Send without a note"]',
     'button[aria-label*="Send without a note" i]',
+    '[aria-label*="Send without a note" i]',
     'button[aria-label*="send without" i]',
+    '[aria-label*="send without" i]',
   ];
 
   for (const sel of selectors) {
-    const btn = root.querySelector(sel);
-    if (btn && !btn.disabled) return btn;
+    let found = [];
+    try { found = Array.from(root.querySelectorAll(sel)); } catch (e) { continue; }
+    for (const btn of found) {
+      if (btn && !btn.disabled) return btn;
+    }
   }
 
-  const candidates = Array.from(root.querySelectorAll("button, [role='button']"));
+  const candidates = Array.from(root.querySelectorAll("button, [role='button'], [componentkey], [aria-label]"));
   for (const el of candidates) {
     const text = normalizeText(el.textContent || "");
     const label = normalizeText(el.getAttribute?.("aria-label") || "");
@@ -135,20 +141,29 @@ function collectActionButtonDebug() {
 
 function robustClick(el) {
   if (!el) return false;
-  try { el.click(); } catch (e) { /* ignore */ }
+  // Click the nearest interactive ancestor if the matched node is a label/icon wrapper.
+  const target = (el.closest && el.closest('button, a, [role="button"], [componentkey], [aria-label]')) || el;
   try {
-    const rect = el.getBoundingClientRect && el.getBoundingClientRect();
-    const evOpts = {
-      bubbles: true,
-      cancelable: true,
-      view: window,
-      clientX: rect ? rect.left + 2 : 2,
-      clientY: rect ? rect.top + 2 : 2
-    };
-    el.dispatchEvent(new MouseEvent("mousedown", evOpts));
-    el.dispatchEvent(new MouseEvent("mouseup", evOpts));
-    el.dispatchEvent(new MouseEvent("click", evOpts));
+    const rect = target.getBoundingClientRect && target.getBoundingClientRect();
+    const cx = rect ? rect.left + Math.min(10, (rect.width || 4) / 2) : 2;
+    const cy = rect ? rect.top + Math.min(10, (rect.height || 4) / 2) : 2;
+    const opts = { bubbles: true, cancelable: true, view: window, clientX: cx, clientY: cy, button: 0 };
+    // Pointer events FIRST — LinkedIn's new custom components listen for these,
+    // and a bare .click() often does nothing on them.
+    try {
+      target.dispatchEvent(new PointerEvent("pointerover", opts));
+      target.dispatchEvent(new PointerEvent("pointerenter", opts));
+      target.dispatchEvent(new PointerEvent("pointerdown", { ...opts, isPrimary: true }));
+      target.dispatchEvent(new PointerEvent("pointerup", { ...opts, isPrimary: true }));
+    } catch (e) { /* PointerEvent unsupported — fall through to mouse events */ }
+    target.dispatchEvent(new MouseEvent("mousedown", opts));
+    target.dispatchEvent(new MouseEvent("mouseup", opts));
+    target.dispatchEvent(new MouseEvent("click", opts));
   } catch (e) { /* ignore */ }
+  // Native click as last resort — but NOT on links, where it would force a full
+  // page navigation to the href instead of letting LinkedIn's SPA open the modal.
+  const isAnchor = target.tagName === "A" || (target.closest && target.closest("a[href]"));
+  if (!isAnchor) { try { target.click(); } catch (e) { /* ignore */ } }
   return true;
 }
 
@@ -174,6 +189,11 @@ function isFirstDegreeConnection() {
 
 function findDirectConnectButton() {
   const selectors = [
+    // New LinkedIn UI: the Connect control is often a <div>/custom element with
+    // aria-label "Invite <name> to connect" and a componentkey attribute.
+    '[aria-label^="Invite"][aria-label*="to connect" i]',
+    '[componentkey][aria-label*="to connect" i]',
+    // Older UI variants
     'button[aria-label*="Connect"]',
     'button[aria-label*="Invite"][aria-label*="connect" i]',
     'div[aria-label*="Invite"][aria-label*="connect" i]',
@@ -184,11 +204,15 @@ function findDirectConnectButton() {
     '.artdeco-button--2[aria-label*="Connect"]',
   ];
   for (const sel of selectors) {
-    const btn = document.querySelector(sel);
-    if (!btn || btn.disabled) continue;
-    const label = (btn.getAttribute("aria-label") || "").toLowerCase();
-    if (/message|follow|pending|withdraw/i.test(label)) continue;
-    return btn;
+    let matches = [];
+    try { matches = Array.from(document.querySelectorAll(sel)); } catch (e) { continue; }
+    for (const btn of matches) {
+      if (!btn || btn.disabled) continue;
+      const label = (btn.getAttribute("aria-label") || "").toLowerCase();
+      if (/message|follow|pending|withdraw|remove connection/i.test(label)) continue;
+      if (!isElementVisible(btn)) continue;
+      return btn;
+    }
   }
   // Fallback: search for visible text "Connect" inside the top card (some pages render as div/span)
   const byText = findConnectByText();
@@ -337,71 +361,75 @@ async function waitForActionMenu(timeoutMs = 3500) {
   return null;
 }
 
+function closeAnyMenu() {
+  try {
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", code: "Escape", keyCode: 27, bubbles: true }));
+  } catch (e) { /* ignore */ }
+  try { document.body.click(); } catch (e) { /* ignore */ }
+}
+
+// Find the Connect item inside an opened dropdown menu (new UI: an <a> whose
+// href points at /preload/custom-invite, or any node labelled "...to connect").
+function findConnectInMenu(menu) {
+  if (!menu) return null;
+  const byHref = menu.querySelector('a[href*="custom-invite" i]');
+  if (byHref) return byHref;
+  const byLabel = menu.querySelector('[aria-label*="to connect" i], [aria-label*="invite" i][aria-label*="connect" i]');
+  if (byLabel) return byLabel;
+  // Text fallback — a menuitem whose visible text is exactly "Connect"
+  const items = Array.from(menu.querySelectorAll('a[role="menuitem"], [role="menuitem"], [role="option"], button, li, div[aria-label]'));
+  for (const el of items) {
+    const text = normalizeText(el.textContent || "").toLowerCase();
+    if (text === "connect" || /\bconnect\b/.test(text)) return el;
+  }
+  return null;
+}
+
 async function tryMoreActionsConnect() {
-  // LinkedIn uses different aria-labels like "More" or "More actions"
-  const moreBtn = document.querySelector(
-    'button[aria-label="More"], button[aria-label*="more" i], button[aria-label*="More actions" i], button[aria-label*="more actions" i], button[aria-haspopup="menu"]'
-  );
-  if (!moreBtn) return { element: null, followOnly: false };
+  // The new LinkedIn profile has SEVERAL "More" buttons (profile actions AND
+  // every post in the activity feed). Clicking the wrong one opens a post menu
+  // with no Connect. So: gather all "More" buttons, try them top-to-bottom, and
+  // only use the one whose dropdown actually contains a Connect/custom-invite item.
+  let moreButtons = Array.from(document.querySelectorAll(
+    'button[aria-label="More"], button[aria-label="More actions"], button[aria-label*="more actions" i], [componentkey][aria-label="More"], button[aria-haspopup="menu"], button[aria-expanded][aria-label*="more" i]'
+  )).filter(isElementVisible);
 
-  robustClick(moreBtn);
-  await sleep(300);
+  // De-dupe and sort by vertical position (profile action More sits near the top).
+  moreButtons = Array.from(new Set(moreButtons)).sort((a, b) => {
+    try { return a.getBoundingClientRect().top - b.getBoundingClientRect().top; } catch (e) { return 0; }
+  });
 
-  const menu = await waitForActionMenu(3500) || findMenuContainer();
-  if (!menu) return { element: null, followOnly: false };
-  const connectByHref = menu.querySelector(
-    'a[role="menuitem"][href*="/preload/custom-invite" i], a[role="menuitem"][href*="custom-invite" i]'
-  );
-  const connectByLabel = menu.querySelector(
-    '[aria-label*="invite" i][aria-label*="connect" i], [aria-label*="to connect" i]'
-  );
-  const connectByText = findMenuItemByText(menu, /\bconnect\b/i);
-  const connectEl = connectByHref || connectByLabel || connectByText;
-  const followEl = findMenuItemByText(menu, /\bfollow\b/i);
+  if (moreButtons.length === 0) return { element: null, followOnly: false };
 
-  if (connectEl) {
-    const btn = connectEl.closest("button, [role='menuitem'], [role='option'], a, [role='button'], div[aria-label], li") || connectEl;
-    robustClick(btn);
-    return { element: btn, followOnly: false };
-  }
+  let sawFollow = false;
 
-  // Only mark follow-only when we can see a follow action and no invite/connect marker at all.
-  const hasAnyInviteConnect = !!menu.querySelector(
-    'a[role="menuitem"][href*="custom-invite" i], [aria-label*="invite" i][aria-label*="connect" i], [aria-label*="to connect" i]'
-  );
-  if (followEl && !hasAnyInviteConnect) {
-    try { document.body.click(); } catch (e) { /* ignore */ }
-    return { element: null, followOnly: true };
-  }
+  for (const moreBtn of moreButtons) {
+    robustClick(moreBtn);
+    await sleep(400);
 
-  const items = menu.querySelectorAll(
-    '[role="option"], .artdeco-dropdown__item, li.mn-overflow-menu__option, [role="menuitem"], a[role="menuitem"], div[aria-label*="connect" i], div[aria-label*="invite" i]'
-  );
-  for (const item of items) {
-    const itemText = normalizeText(item.textContent || "");
-    const itemLabel = normalizeText(item.getAttribute?.("aria-label") || "");
-    if (/connect/i.test(itemText) || /connect/i.test(itemLabel)) {
-      const btn = item.querySelector("button, [role='button']") || item;
+    const menu = await waitForActionMenu(2500) || findMenuContainer();
+    if (!menu) { closeAnyMenu(); await sleep(150); continue; }
+
+    const connectEl = findConnectInMenu(menu);
+    if (connectEl) {
+      // Prefer the inner labelled element ("Invite … to connect") over the
+      // wrapping <a>, so the click lands like a real user tap and the SPA opens
+      // the invite modal rather than navigating to the custom-invite href.
+      const inner = connectEl.querySelector && connectEl.querySelector('[aria-label*="to connect" i]');
+      const btn = inner || connectEl;
       robustClick(btn);
       return { element: btn, followOnly: false };
     }
+
+    if (findMenuItemByText(menu, /\bfollow\b/i)) sawFollow = true;
+
+    // Wrong menu (e.g. a post's menu) or Connect simply isn't here — close, try next.
+    closeAnyMenu();
+    await sleep(200);
   }
 
-  const globalInviteMenuItem = Array.from(menu.querySelectorAll('a[role="menuitem"], [role="menuitem"]')).find((el) => {
-    if (!isElementVisible(el)) return false;
-    const href = normalizeText(el.getAttribute?.("href") || "");
-    const label = normalizeText(el.getAttribute?.("aria-label") || "");
-    const text = normalizeText(el.textContent || "");
-    return /custom-invite/i.test(href) || (/invite/i.test(label) && /connect/i.test(label)) || /\bconnect\b/i.test(text);
-  });
-  if (globalInviteMenuItem) {
-    const btn = globalInviteMenuItem.closest("a, button, [role='menuitem'], [role='button'], div[aria-label]") || globalInviteMenuItem;
-    robustClick(btn);
-    return { element: btn, followOnly: false };
-  }
-
-  // Connect not in dropdown — close it
-  document.body.click();
+  // No menu had Connect. If we only ever saw Follow, treat as follow-only.
+  if (sawFollow) return { element: null, followOnly: true };
   return { element: null, followOnly: false };
 }
 
