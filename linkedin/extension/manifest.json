@@ -19,7 +19,7 @@
     "https://www.instahyre.com/*",
     "https://jobhuntpro-linkedin-api.onrender.com/*",
     "https://jobhuntpro-cold-api.onrender.com/*",
-    "https://jobhuntpro-frontend.vercel.app/*",
+    "https://job-hunt-pro.vercel.app/*",
     "http://localhost:3001/*",
     "http://localhost:8000/*"
   ],
@@ -28,7 +28,7 @@
   },
   "content_scripts": [
     {
-      "matches": ["https://jobhuntpro-frontend.vercel.app/*"],
+      "matches": ["https://job-hunt-pro.vercel.app/*"],
       "js": ["content/token_sync.js"],
       "run_at": "document_idle"
     }

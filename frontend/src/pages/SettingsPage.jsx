@@ -39,6 +39,10 @@ export default function SettingsPage() {
   const [gmailConnected, setGmailConnected] = useState(false)
   const [gmailConnecting, setGmailConnecting] = useState(false)
   const [gmailMsg, setGmailMsg] = useState('')
+  // Whether secrets already exist server-side (we never load the values themselves)
+  const [hasGeminiKey, setHasGeminiKey] = useState(false)
+  const [hasClaudeKey, setHasClaudeKey] = useState(false)
+  const [hasGmailPassword, setHasGmailPassword] = useState(false)
 
   // Inline Gmail OAuth connect (auth-code flow → backend exchanges for a
   // refresh token with gmail.send scope, stored encrypted).
@@ -80,6 +84,9 @@ export default function SettingsPage() {
         const projects = Array.isArray(data.projects) ? data.projects : []
         while (projects.length < 3) projects.push('')
         setGmailConnected(!!data.has_gmail_connected)
+        setHasGeminiKey(!!data.has_gemini_key)
+        setHasClaudeKey(!!data.has_claude_key)
+        setHasGmailPassword(!!data.has_gmail_password)
         setForm(f => ({
           ...f,
           gmail_address: data.gmail_address || '',
@@ -163,6 +170,13 @@ export default function SettingsPage() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.detail || 'Failed to save')
 
+      // Reflect newly-saved secrets in the "saved" indicators, then clear the
+      // input boxes (we never keep secret values in the form after saving).
+      if (allGeminiKeys.length > 0) setHasGeminiKey(true)
+      if (form.claude_api_key.trim()) setHasClaudeKey(true)
+      if (form.gmail_app_password.trim()) setHasGmailPassword(true)
+      setForm(f => ({ ...f, gemini_api_key: '', gemini_api_keys: '', claude_api_key: '', gmail_app_password: '' }))
+
       await refreshUser()
       setSaved(true)
     } catch (err) {
@@ -244,7 +258,7 @@ export default function SettingsPage() {
               </summary>
               <div style={{ marginTop: 10 }}>
                 <HelpLink href="https://support.google.com/accounts/answer/185833" label="How to create an App Password →" />
-                <Input label="Gmail App Password" type="password" value={form.gmail_app_password} onChange={v => set('gmail_app_password', v)} placeholder="16-char app password (leave blank to keep existing)" />
+                <Input label="Gmail App Password" type="password" saved={hasGmailPassword} value={form.gmail_app_password} onChange={v => set('gmail_app_password', v)} placeholder="16-char app password (leave blank to keep existing)" />
               </div>
             </details>
           </Section>
@@ -257,7 +271,7 @@ export default function SettingsPage() {
               Your key, when set, is always tried first.
             </p>
             <HelpLink href="https://aistudio.google.com/app/apikey" label="Get a free Gemini API key →" />
-            <Input label="Gemini API Key" type="password" value={form.gemini_api_key} onChange={v => set('gemini_api_key', v)} placeholder="AIza… (leave blank to keep existing)" />
+            <Input label="Gemini API Key" type="password" saved={hasGeminiKey} value={form.gemini_api_key} onChange={v => set('gemini_api_key', v)} placeholder={hasGeminiKey ? 'Key(s) saved — leave blank to keep, or type to add another' : 'AIza… (leave blank to keep existing)'} />
             <label style={{ display: 'block', color: '#7a6a5e', fontSize: 12, marginBottom: 4 }}>
               Additional Gemini API Keys (one per line)
             </label>
@@ -272,7 +286,7 @@ export default function SettingsPage() {
               Existing keys are hidden. New keys are appended as fallbacks.
             </p>
             <HelpLink href="https://console.anthropic.com/settings/keys" label="Get a Claude API key →" />
-            <Input label="Claude API Key" type="password" value={form.claude_api_key} onChange={v => set('claude_api_key', v)} placeholder="sk-ant-… (leave blank to keep existing)" />
+            <Input label="Claude API Key" type="password" saved={hasClaudeKey} value={form.claude_api_key} onChange={v => set('claude_api_key', v)} placeholder="sk-ant-… (leave blank to keep existing)" />
           </Section>
 
           {/* ── Section: Personal Info ─────────────────────── */}
@@ -458,10 +472,20 @@ function Section({ title, children }) {
   )
 }
 
-function Input({ label, type = 'text', value, onChange, placeholder, required }) {
+function SavedBadge() {
+  return (
+    <span style={{ marginLeft: 8, color: '#4a8f47', fontSize: 11, fontWeight: 600, background: 'rgba(74,143,71,0.12)', border: '1px solid rgba(74,143,71,0.35)', borderRadius: 10, padding: '1px 8px' }}>
+      ✓ Saved
+    </span>
+  )
+}
+
+function Input({ label, type = 'text', value, onChange, placeholder, required, saved }) {
   return (
     <div style={{ marginBottom: 12 }}>
-      <label style={{ display: 'block', color: '#7a6a5e', fontSize: 12, marginBottom: 4 }}>{label}</label>
+      <label style={{ display: 'block', color: '#7a6a5e', fontSize: 12, marginBottom: 4 }}>
+        {label}{saved && <SavedBadge />}
+      </label>
       <input
         type={type}
         value={value}

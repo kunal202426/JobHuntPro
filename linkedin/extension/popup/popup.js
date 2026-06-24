@@ -2,9 +2,9 @@
 // deployed service URLs. If you claim different service names at deploy, update
 // these (and background.js + manifest.json) to the real URLs.
 const BACKEND = (typeof __BACKEND_URL__ !== "undefined") ? __BACKEND_URL__ : "https://jobhuntpro-linkedin-api.onrender.com";
-const FRONTEND = (typeof __FRONTEND_URL__ !== "undefined") ? __FRONTEND_URL__ : "https://jobhuntpro-frontend.vercel.app";
+const FRONTEND = (typeof __FRONTEND_URL__ !== "undefined") ? __FRONTEND_URL__ : "https://job-hunt-pro.vercel.app";
 const COLD_API = (typeof __COLD_API_URL__ !== "undefined") ? __COLD_API_URL__ : "https://jobhuntpro-cold-api.onrender.com";
-const GOOGLE_CLIENT_ID = (typeof __GOOGLE_CLIENT_ID__ !== "undefined") ? __GOOGLE_CLIENT_ID__ : "999980379983-p12hcj042sc9au25jt68vfkp9bub5opq.apps.googleusercontent.com";
+const GOOGLE_CLIENT_ID = (typeof __GOOGLE_CLIENT_ID__ !== "undefined") ? __GOOGLE_CLIENT_ID__ : "423029767273-arma4d61l5ktli5gutmdgdee5krqpqm9.apps.googleusercontent.com";
 
 const MIN_LIMIT = 1;
 const MAX_LIMIT = 100;

@@ -94,10 +94,17 @@
 
 | # | Target | Action | Status | Notes |
 |---|--------|--------|--------|-------|
-| 5.1 | Cold API (Render) | root `cold/backend`, persistent disk `/data`, env vars | ⏳ | `DATABASE_URL=sqlite:////data/cold_email.db` |
-| 5.2 | LinkedIn API (Render) | root `linkedin/backend`, persistent disk `/data`, env vars | ⏳ | `SQLITE_DB_PATH=/data/jobhunt.db` |
-| 5.3 | Frontend (Vercel) | connect repo, set VITE_* env vars | ⏳ | |
-| 5.4 | Extension | load unpacked, verify popup login + URLs | ⏳ | |
+| 5.0 | GitHub | Push code to private repo (prereq for Render+Vercel) | ✅ | github.com/kunal202426/JobHuntPro (private) |
+| 5.1 | Neon Postgres | DB created + tables initialized (tested live) | ✅ | neondb @ ep-aged-salad-aixcl77t us-east-1 |
+| 5.2 | Turso | DB created + tables initialized (tested live) | ✅ | jobhunt-kunal202426 ap-south-1 |
+| 5.3 | Cold API (Render) | LIVE — /health 200 | ✅ | https://jobhuntpro-cold-api.onrender.com |
+| 5.4 | LinkedIn API (Render) | LIVE — /health 200 | ✅ | https://jobhuntpro-linkedin-api.onrender.com |
+| 5.5 | Frontend (Vercel) | import repo, set VITE_* env vars | 🔨 | uses vercel.json; planned URL confirmed |
+| 5.6 | Extension | load unpacked, verify popup login + URLs | ⏳ | popup.js updated to NEW Google client ID |
+
+**New Google OAuth client (2026-06-24):** `423029767273-arma4d61l5ktli5gutmdgdee5krqpqm9.apps.googleusercontent.com` — used in frontend env, cold env, extension popup.js.
+
+**Generated secrets (2026-06-24)** — given to user in chat; NOT stored here.
 
 ---
 
