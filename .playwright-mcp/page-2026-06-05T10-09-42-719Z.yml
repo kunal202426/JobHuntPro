@@ -1,0 +1,202 @@
+- generic [ref=e3]:
+  - navigation [ref=e4]:
+    - generic [ref=e5]: Workspace
+    - link "JobHunt Engine" [ref=e6] [cursor=pointer]:
+      - /url: /jobhunt
+      - text: JobHunt Engine
+    - link "Cold Outreach" [ref=e8] [cursor=pointer]:
+      - /url: /cold
+      - text: Cold Outreach
+    - generic [ref=e10]:
+      - link "? Help" [ref=e11] [cursor=pointer]:
+        - /url: /help
+      - link "⚙ Settings" [ref=e12] [cursor=pointer]:
+        - /url: /settings
+      - button "Sign out" [ref=e13] [cursor=pointer]
+  - generic [ref=e14]:
+    - generic [ref=e15]: 👋 First time here? Follow the setup guide to get started.
+    - link "View Setup Guide →" [ref=e16] [cursor=pointer]:
+      - /url: /help
+    - button "Dismiss" [ref=e17] [cursor=pointer]: ×
+  - generic [ref=e18]:
+    - option "All Sources" [selected]
+    - option "Naukri"
+    - option "Linkedin"
+    - option "Cutshort"
+    - option "Instahyre"
+    - option "All quality" [selected]
+    - option "Top match (8+)"
+    - option "Strong match (6+)"
+    - option "Posted < 24h"
+    - option "Remote-first"
+    - option "Startup"
+    - option "Newest" [selected]
+    - option "Best Score"
+    - option "Company"
+    - option "LinkedIn" [selected]
+    - option "Naukri"
+    - option "Cutshort"
+    - option "Instahyre"
+    - option "All portals"
+    - option "All company portals" [selected]
+    - option "LinkedIn"
+    - option "Naukri"
+    - option "Instahyre"
+    - option "All Jobs" [selected]
+    - option "All Categories" [selected]
+    - option "Hiring Managers"
+    - option "Senior Engineers"
+    - option "Recruiters"
+    - option "Peers"
+    - generic [ref=e21]:
+      - banner [ref=e22]:
+        - generic [ref=e23]:
+          - heading "Cold Outreach Hub" [level=1] [ref=e24]
+          - paragraph [ref=e25]: Automate your HR outreach with GenAI 🚀
+        - generic [ref=e26]:
+          - generic [ref=e27]:
+            - button "Outreach" [ref=e28] [cursor=pointer]
+            - button "Prospecting" [ref=e29] [cursor=pointer]
+          - button "Bulk CSV" [ref=e30] [cursor=pointer]:
+            - img [ref=e31]
+            - text: Bulk CSV
+          - generic [ref=e34]:
+            - generic [ref=e35]:
+              - generic [ref=e36]: 📧 Daily Quota
+              - generic [ref=e37]:
+                - strong [ref=e38]: "0"
+                - text: / 90 emails sent
+            - button "Process Queue" [ref=e40] [cursor=pointer]:
+              - img [ref=e41]
+              - text: Process Queue
+      - main [ref=e43]:
+        - generic [ref=e59]:
+          - complementary [ref=e60]:
+            - generic [ref=e61]:
+              - heading "⚡ Add New HR Lead" [level=2] [ref=e62]
+              - paragraph [ref=e63]: Enter details to auto-generate a draft you approve before sending.
+              - generic [ref=e64]:
+                - generic [ref=e65]:
+                  - generic [ref=e66]: Email Type
+                  - generic [ref=e67]:
+                    - button "Cold Outreach" [ref=e68] [cursor=pointer]
+                    - button "Referral – Their Work" [ref=e69] [cursor=pointer]
+                    - button "Referral – Job Posting" [ref=e70] [cursor=pointer]
+                    - button "LinkedIn Referral" [ref=e71] [cursor=pointer]
+                - generic [ref=e72]:
+                  - generic [ref=e73]:
+                    - generic [ref=e74]:
+                      - img [ref=e75]
+                      - text: HR Name*
+                    - textbox "e.g. Sarah Connor" [ref=e78]
+                  - generic [ref=e79]:
+                    - generic [ref=e80]:
+                      - img [ref=e81]
+                      - text: HR Email*
+                    - textbox "sarah@company.com" [ref=e84]
+                - generic [ref=e85]:
+                  - generic [ref=e86]:
+                    - generic [ref=e87]:
+                      - img [ref=e88]
+                      - text: Position
+                    - textbox "e.g. Technical Recruiter" [ref=e91]
+                  - generic [ref=e92]:
+                    - generic [ref=e93]:
+                      - img [ref=e94]
+                      - text: Company*
+                    - textbox "Company Name" [ref=e97]
+                - generic [ref=e98]:
+                  - generic [ref=e99]:
+                    - generic [ref=e100]:
+                      - img [ref=e101]
+                      - text: Company URL
+                    - textbox "https://..." [ref=e104]
+                  - generic [ref=e105]:
+                    - generic [ref=e106]:
+                      - img [ref=e107]
+                      - text: LinkedIn URL
+                    - textbox "https://linkedin.com/in/..." [ref=e110]
+                - generic [ref=e111]:
+                  - generic [ref=e112]:
+                    - img [ref=e113]
+                    - text: Extra Notes / Context
+                  - textbox "e.g. 'They recently raised Series B' or 'Hiring for Frontend Engineers'" [ref=e116]
+                - button "Generate Preview" [ref=e117] [cursor=pointer]:
+                  - img [ref=e118]
+                  - text: Generate Preview
+          - generic [ref=e122]:
+            - generic [ref=e123]:
+              - generic [ref=e124]:
+                - generic [ref=e125]:
+                  - button "All" [ref=e126] [cursor=pointer]
+                  - button "📝 Draft" [ref=e127] [cursor=pointer]
+                  - button "🟡 Pending" [ref=e128] [cursor=pointer]
+                  - button "🔵 Queued" [ref=e129] [cursor=pointer]
+                  - button "🟢 Sent" [ref=e130] [cursor=pointer]
+                  - button "🔴 Failed" [ref=e131] [cursor=pointer]
+                  - button "💬 Replied" [ref=e132] [cursor=pointer]
+                - generic [ref=e133]:
+                  - textbox "Filter by company…" [ref=e134]
+                  - button "Refresh" [ref=e135] [cursor=pointer]:
+                    - img [ref=e136]
+              - generic [ref=e141]:
+                - generic [ref=e142]:
+                  - button "All Time" [ref=e143] [cursor=pointer]
+                  - button "Today" [ref=e144] [cursor=pointer]
+                  - button "Yesterday" [ref=e145] [cursor=pointer]
+                  - button "This Week" [ref=e146] [cursor=pointer]
+                - generic [ref=e147]:
+                  - button "Table" [ref=e148] [cursor=pointer]
+                  - button "Company" [ref=e149] [cursor=pointer]
+            - table [ref=e151]:
+              - rowgroup [ref=e152]:
+                - row "Name Company Position Status Sent At Actions" [ref=e153]:
+                  - columnheader "Name" [ref=e154]
+                  - columnheader "Company" [ref=e155]
+                  - columnheader "Position" [ref=e156]
+                  - columnheader "Status" [ref=e157]
+                  - columnheader "Sent At" [ref=e158]
+                  - columnheader "Actions" [ref=e159]
+              - rowgroup [ref=e160]:
+                - row:
+                  - cell
+                  - cell
+                  - cell
+                  - cell
+                  - cell
+                  - cell
+                - row:
+                  - cell
+                  - cell
+                  - cell
+                  - cell
+                  - cell
+                  - cell
+                - row:
+                  - cell
+                  - cell
+                  - cell
+                  - cell
+                  - cell
+                  - cell
+                - row:
+                  - cell
+                  - cell
+                  - cell
+                  - cell
+                  - cell
+                  - cell
+                - row:
+                  - cell
+                  - cell
+                  - cell
+                  - cell
+                  - cell
+                  - cell
+                - row:
+                  - cell
+                  - cell
+                  - cell
+                  - cell
+                  - cell
+                  - cell

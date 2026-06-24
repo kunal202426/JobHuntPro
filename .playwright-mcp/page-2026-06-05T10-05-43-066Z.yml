@@ -1,0 +1,17 @@
+- generic [ref=e4]:
+  - heading "JobHuntPro" [level=1] [ref=e5]
+  - paragraph [ref=e6]: Sign in to continue
+  - generic [ref=e7]:
+    - textbox "Email" [ref=e8]
+    - textbox "Password" [ref=e9]
+    - button "Sign in" [ref=e10] [cursor=pointer]
+  - paragraph [ref=e11]:
+    - text: No account?
+    - button "Sign up" [ref=e12] [cursor=pointer]
+  - generic [ref=e15]: or
+  - generic [ref=e19]:
+    - button "Sign in with Google. Opens in new tab" [ref=e21] [cursor=pointer]:
+      - generic [ref=e23]:
+        - img [ref=e26]
+        - generic [ref=e33]: Sign in with Google
+    - iframe

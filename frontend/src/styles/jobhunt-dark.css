@@ -1,0 +1,143 @@
+/*
+ * Dark theme override for the JobHunt Engine pane.
+ * Applied via .lh-dark wrapper in JobHuntRoute.jsx.
+ * Remaps Tailwind light-theme utility classes to match the
+ * Cold Outreach dark palette — no component code changes needed.
+ *
+ * Palette:
+ *   --app-bg:    #0f172a   (app background)
+ *   --card-bg:   #1e293b   (card / header / panel background)
+ *   --deep-bg:   #0d1424   (slightly darker, for alternating rows)
+ *   --border:    #1e293b   (subtle border)
+ *   --border-md: #334155   (visible border)
+ *   --text-1:    #f1f5f9   (primary text)
+ *   --text-2:    #cbd5e1   (secondary text)
+ *   --text-3:    #94a3b8   (muted text)
+ *   --text-4:    #64748b   (very muted / placeholder)
+ *   --accent:    #6366f1   (primary action — matches Cold Outreach indigo)
+ */
+
+/* ── Root & default text ────────────────────────────────── */
+.lh-dark {
+  background: #0f172a;
+  color: #f1f5f9;
+}
+
+/* ── Backgrounds ────────────────────────────────────────── */
+.lh-dark .bg-white           { background-color: #1e293b !important; }
+.lh-dark .bg-stone-50        { background-color: #162032 !important; }
+.lh-dark .bg-stone-100       { background-color: #0f172a !important; }
+.lh-dark .bg-stone-200       { background-color: #1e293b !important; }
+.lh-dark .bg-slate-50        { background-color: #162032 !important; }
+.lh-dark .bg-slate-100       { background-color: #1e293b !important; }
+.lh-dark .bg-slate-200       { background-color: #1e293b !important; }
+
+/* Opacity variants */
+.lh-dark .bg-white\/90       { background-color: rgba(18, 30, 50, 0.92) !important; }
+.lh-dark .bg-white\/80       { background-color: rgba(18, 30, 50, 0.85) !important; }
+.lh-dark .bg-stone-100\/80   { background-color: rgba(15, 23, 42, 0.85) !important; }
+
+/* Primary action buttons — match Cold Outreach indigo instead of slate-900 */
+.lh-dark .bg-slate-900       { background-color: #4f46e5 !important; }
+.lh-dark .hover\:bg-slate-800:hover { background-color: #4338ca !important; }
+.lh-dark .bg-slate-800       { background-color: #4338ca !important; }
+
+/* Hover on light backgrounds */
+.lh-dark .hover\:bg-stone-100:hover { background-color: #1e293b !important; }
+.lh-dark .hover\:bg-stone-50:hover  { background-color: #162032 !important; }
+.lh-dark .hover\:bg-white:hover     { background-color: #263348 !important; }
+.lh-dark .hover\:bg-slate-50:hover  { background-color: #162032 !important; }
+.lh-dark .hover\:bg-slate-100:hover { background-color: #1e293b !important; }
+.lh-dark .hover\:bg-rose-50:hover   { background-color: rgba(127, 29, 29, 0.25) !important; }
+
+/* ── Text ───────────────────────────────────────────────── */
+.lh-dark .text-slate-900  { color: #f1f5f9 !important; }
+.lh-dark .text-slate-800  { color: #e2e8f0 !important; }
+.lh-dark .text-slate-700  { color: #cbd5e1 !important; }
+.lh-dark .text-slate-600  { color: #94a3b8 !important; }
+.lh-dark .text-slate-500  { color: #64748b !important; }
+.lh-dark .text-slate-400  { color: #475569 !important; }
+.lh-dark .text-stone-900  { color: #f1f5f9 !important; }
+.lh-dark .text-stone-800  { color: #e2e8f0 !important; }
+.lh-dark .text-stone-700  { color: #cbd5e1 !important; }
+.lh-dark .text-stone-600  { color: #94a3b8 !important; }
+.lh-dark .text-stone-500  { color: #64748b !important; }
+.lh-dark .text-stone-400  { color: #475569 !important; }
+
+/* Hover text */
+.lh-dark .hover\:text-slate-900:hover { color: #f1f5f9 !important; }
+.lh-dark .hover\:text-slate-700:hover { color: #cbd5e1 !important; }
+
+/* ── Borders ────────────────────────────────────────────── */
+.lh-dark .border-stone-200  { border-color: #1e293b !important; }
+.lh-dark .border-stone-300  { border-color: #334155 !important; }
+.lh-dark .border-stone-400  { border-color: #475569 !important; }
+.lh-dark .border-slate-200  { border-color: #1e293b !important; }
+.lh-dark .border-slate-300  { border-color: #334155 !important; }
+.lh-dark .border-rose-200   { border-color: rgba(159, 18, 57, 0.5) !important; }
+
+/* Hover border */
+.lh-dark .hover\:border-rose-200:hover { border-color: rgba(159, 18, 57, 0.5) !important; }
+
+/* Divide (hr-like separators between children) */
+.lh-dark .divide-stone-200 > :not([hidden]) ~ :not([hidden]) {
+  border-color: #1e293b !important;
+}
+
+/* ── Inputs & textareas ─────────────────────────────────── */
+.lh-dark input:not([type="checkbox"]):not([type="radio"]),
+.lh-dark textarea,
+.lh-dark select {
+  background-color: #0f172a !important;
+  border-color: #334155 !important;
+  color: #f1f5f9 !important;
+}
+.lh-dark input::placeholder,
+.lh-dark textarea::placeholder {
+  color: #475569 !important;
+}
+.lh-dark input:focus,
+.lh-dark textarea:focus,
+.lh-dark select:focus {
+  border-color: #6366f1 !important;
+  outline: none !important;
+}
+
+/* ── Shadows ────────────────────────────────────────────── */
+.lh-dark .shadow-sm  { box-shadow: 0 1px 3px rgba(0,0,0,0.5) !important; }
+.lh-dark .shadow     { box-shadow: 0 2px 8px rgba(0,0,0,0.5) !important; }
+.lh-dark .shadow-md  { box-shadow: 0 4px 12px rgba(0,0,0,0.5) !important; }
+
+/* ── Status badge background adjustments for dark ─────── */
+/* Keep hue, deepen to work on dark backgrounds */
+.lh-dark .bg-emerald-100 { background-color: rgba(6, 78, 59, 0.4) !important; }
+.lh-dark .bg-sky-100     { background-color: rgba(7, 89, 133, 0.4) !important; }
+.lh-dark .bg-sky-200     { background-color: rgba(7, 89, 133, 0.55) !important; }
+.lh-dark .bg-rose-100    { background-color: rgba(159, 18, 57, 0.35) !important; }
+.lh-dark .bg-rose-50     { background-color: rgba(159, 18, 57, 0.2) !important; }
+.lh-dark .bg-indigo-100  { background-color: rgba(49, 46, 129, 0.45) !important; }
+.lh-dark .bg-violet-100  { background-color: rgba(76, 29, 149, 0.4) !important; }
+.lh-dark .bg-amber-100   { background-color: rgba(120, 53, 15, 0.4) !important; }
+
+/* ── Active / selected states ───────────────────────────── */
+.lh-dark .bg-sky-500  { background-color: #0369a1 !important; }
+.lh-dark .text-white  { color: #fff !important; }
+
+/* Indigo queue running button */
+.lh-dark .bg-indigo-600       { background-color: #4f46e5 !important; }
+.lh-dark .hover\:bg-indigo-500:hover { background-color: #4338ca !important; }
+.lh-dark .bg-emerald-600      { background-color: #059669 !important; }
+.lh-dark .hover\:bg-emerald-500:hover { background-color: #047857 !important; }
+
+/* ── Scrollbars ─────────────────────────────────────────── */
+.lh-dark ::-webkit-scrollbar       { width: 6px; height: 6px; }
+.lh-dark ::-webkit-scrollbar-track { background: #0f172a; }
+.lh-dark ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+.lh-dark ::-webkit-scrollbar-thumb:hover { background: #475569; }
+
+/* ── Toast override ─────────────────────────────────────── */
+.lh-dark .go2072408551 {   /* react-hot-toast default class */
+  background: #1e293b !important;
+  color: #f1f5f9 !important;
+  border-color: #334155 !important;
+}

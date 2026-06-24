@@ -1,0 +1,135 @@
+/*
+ * Warm theme override for the JobHunt Engine pane.
+ * Applied via .lh-warm wrapper in JobHuntRoute.jsx.
+ * Matches the Cold Outreach warm beige palette exactly.
+ *
+ * Palette (mirrors cold/src/index.css):
+ *   --bg:        #f5f0eb   (page background)
+ *   --surface-1: #fdfaf8   (card / panel background)
+ *   --surface-0: #ede8e2   (slightly deeper surface)
+ *   --surface-2: #e8e2db   (hover / alternating rows)
+ *   --text:      #1e1510   (primary text)
+ *   --subtext:   #7a6a5e   (secondary / muted text)
+ *   --border:    #d4ccc4   (subtle border)
+ *   --primary:   #c8845a   (action colour — matches Cold Outreach orange)
+ *   --primary-h: #b87348   (hover)
+ */
+
+/* ── Root & default text ────────────────────────────────── */
+.lh-warm {
+  background: #f5f0eb;
+  color: #1e1510;
+  font-family: 'Outfit', 'Inter', sans-serif;
+}
+
+/* ── Backgrounds ────────────────────────────────────────── */
+.lh-warm .bg-white           { background-color: #fdfaf8 !important; }
+.lh-warm .bg-stone-50        { background-color: #fdfaf8 !important; }
+.lh-warm .bg-stone-100       { background-color: #f5f0eb !important; }
+.lh-warm .bg-stone-200       { background-color: #ede8e2 !important; }
+.lh-warm .bg-slate-50        { background-color: #fdfaf8 !important; }
+.lh-warm .bg-slate-100       { background-color: #ede8e2 !important; }
+.lh-warm .bg-slate-200       { background-color: #e8e2db !important; }
+
+/* Opacity variants */
+.lh-warm .bg-white\/90       { background-color: rgba(253, 250, 248, 0.92) !important; }
+.lh-warm .bg-white\/80       { background-color: rgba(253, 250, 248, 0.85) !important; }
+.lh-warm .bg-stone-100\/80   { background-color: rgba(245, 240, 235, 0.85) !important; }
+
+/* Primary action buttons — warm orange instead of slate-900 */
+.lh-warm .bg-slate-900       { background-color: #c8845a !important; }
+.lh-warm .hover\:bg-slate-800:hover { background-color: #b87348 !important; }
+.lh-warm .bg-slate-800       { background-color: #b87348 !important; }
+
+/* Hover on light backgrounds */
+.lh-warm .hover\:bg-stone-100:hover { background-color: #ede8e2 !important; }
+.lh-warm .hover\:bg-stone-50:hover  { background-color: #f5f0eb !important; }
+.lh-warm .hover\:bg-white:hover     { background-color: #ede8e2 !important; }
+.lh-warm .hover\:bg-slate-50:hover  { background-color: #f5f0eb !important; }
+.lh-warm .hover\:bg-slate-100:hover { background-color: #ede8e2 !important; }
+.lh-warm .hover\:bg-rose-50:hover   { background-color: rgba(184, 72, 72, 0.08) !important; }
+
+/* ── Text ───────────────────────────────────────────────── */
+.lh-warm .text-slate-900  { color: #1e1510 !important; }
+.lh-warm .text-slate-800  { color: #2d2118 !important; }
+.lh-warm .text-slate-700  { color: #4a3728 !important; }
+.lh-warm .text-slate-600  { color: #7a6a5e !important; }
+.lh-warm .text-slate-500  { color: #9a8a7e !important; }
+.lh-warm .text-slate-400  { color: #b5aba3 !important; }
+.lh-warm .text-stone-900  { color: #1e1510 !important; }
+.lh-warm .text-stone-800  { color: #2d2118 !important; }
+.lh-warm .text-stone-700  { color: #4a3728 !important; }
+.lh-warm .text-stone-600  { color: #7a6a5e !important; }
+.lh-warm .text-stone-500  { color: #9a8a7e !important; }
+.lh-warm .text-stone-400  { color: #b5aba3 !important; }
+
+/* Hover text */
+.lh-warm .hover\:text-slate-900:hover { color: #1e1510 !important; }
+.lh-warm .hover\:text-slate-700:hover { color: #4a3728 !important; }
+
+/* ── Borders ────────────────────────────────────────────── */
+.lh-warm .border-stone-200  { border-color: #d4ccc4 !important; }
+.lh-warm .border-stone-300  { border-color: #bfb8b0 !important; }
+.lh-warm .border-stone-400  { border-color: #a89e96 !important; }
+.lh-warm .border-slate-200  { border-color: #d4ccc4 !important; }
+.lh-warm .border-slate-300  { border-color: #bfb8b0 !important; }
+.lh-warm .border-rose-200   { border-color: rgba(184, 72, 72, 0.4) !important; }
+
+/* Hover border */
+.lh-warm .hover\:border-rose-200:hover { border-color: rgba(184, 72, 72, 0.4) !important; }
+
+/* Divide separators */
+.lh-warm .divide-stone-200 > :not([hidden]) ~ :not([hidden]) {
+  border-color: #d4ccc4 !important;
+}
+
+/* ── Inputs & textareas ─────────────────────────────────── */
+.lh-warm input:not([type="checkbox"]):not([type="radio"]),
+.lh-warm textarea,
+.lh-warm select {
+  background-color: #fdfaf8 !important;
+  border-color: #d4ccc4 !important;
+  color: #1e1510 !important;
+}
+.lh-warm input::placeholder,
+.lh-warm textarea::placeholder {
+  color: #b5aba3 !important;
+}
+.lh-warm input:focus,
+.lh-warm textarea:focus,
+.lh-warm select:focus {
+  border-color: #c8845a !important;
+  outline: none !important;
+  box-shadow: 0 0 0 2px rgba(200, 132, 90, 0.15) !important;
+}
+
+/* ── Shadows ────────────────────────────────────────────── */
+.lh-warm .shadow-sm  { box-shadow: 0 2px 6px rgba(0,0,0,0.06) !important; }
+.lh-warm .shadow     { box-shadow: 0 4px 12px rgba(0,0,0,0.08) !important; }
+.lh-warm .shadow-md  { box-shadow: 0 6px 18px rgba(0,0,0,0.10) !important; }
+
+/* ── Status badge background adjustments ──────────────── */
+.lh-warm .bg-emerald-100 { background-color: rgba(74, 143, 71, 0.15) !important; }
+.lh-warm .bg-sky-100     { background-color: rgba(58, 134, 168, 0.15) !important; }
+.lh-warm .bg-sky-200     { background-color: rgba(58, 134, 168, 0.25) !important; }
+.lh-warm .bg-rose-100    { background-color: rgba(184, 72, 72, 0.12) !important; }
+.lh-warm .bg-rose-50     { background-color: rgba(184, 72, 72, 0.07) !important; }
+.lh-warm .bg-indigo-100  { background-color: rgba(200, 132, 90, 0.15) !important; }
+.lh-warm .bg-violet-100  { background-color: rgba(168, 120, 48, 0.15) !important; }
+.lh-warm .bg-amber-100   { background-color: rgba(168, 120, 48, 0.15) !important; }
+
+/* ── Active / selected states ───────────────────────────── */
+.lh-warm .bg-sky-500  { background-color: #3a86a8 !important; }
+.lh-warm .text-white  { color: #fff !important; }
+
+/* Coloured action buttons */
+.lh-warm .bg-indigo-600       { background-color: #c8845a !important; }
+.lh-warm .hover\:bg-indigo-500:hover { background-color: #b87348 !important; }
+.lh-warm .bg-emerald-600      { background-color: #4a8f47 !important; }
+.lh-warm .hover\:bg-emerald-500:hover { background-color: #3d7a3a !important; }
+
+/* ── Scrollbars ─────────────────────────────────────────── */
+.lh-warm ::-webkit-scrollbar       { width: 6px; height: 6px; }
+.lh-warm ::-webkit-scrollbar-track { background: #f5f0eb; }
+.lh-warm ::-webkit-scrollbar-thumb { background: #d4ccc4; border-radius: 3px; }
+.lh-warm ::-webkit-scrollbar-thumb:hover { background: #bfb8b0; }

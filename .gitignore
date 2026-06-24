@@ -1,0 +1,32 @@
+# dependencies
+node_modules/
+cold/backend/venv/
+.venv/
+**/__pycache__/
+*.pyc
+
+# env / secrets — NEVER commit real .env files
+.env
+.env.*
+!.env.example
+
+# databases
+*.db
+*.db-shm
+*.db-wal
+cold/backend/cold_email.db
+linkedin/backend/data/
+
+# logs
+*.log
+
+# build output
+dist/
+
+# personal / data files that shouldn't live in the repo
+Kunal_Mathur.pdf
+mailed_emails.csv
+
+# editor/test artifacts
+.playwright-mcp/
+.claude/

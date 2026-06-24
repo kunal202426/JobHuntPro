@@ -1,0 +1,145 @@
+- generic [ref=e34]:
+  - navigation [ref=e35]:
+    - generic [ref=e36]: Workspace
+    - link "JobHunt Engine" [ref=e37] [cursor=pointer]:
+      - /url: /jobhunt
+      - text: JobHunt Engine
+    - link "Cold Outreach" [ref=e39] [cursor=pointer]:
+      - /url: /cold
+      - text: Cold Outreach
+    - generic [ref=e41]:
+      - link "? Help" [ref=e42] [cursor=pointer]:
+        - /url: /help
+      - link "⚙ Settings" [ref=e43] [cursor=pointer]:
+        - /url: /settings
+      - button "Sign out" [ref=e44] [cursor=pointer]
+  - generic [ref=e45]:
+    - generic [ref=e46]: 👋 First time here? Follow the setup guide to get started.
+    - link "View Setup Guide →" [ref=e47] [cursor=pointer]:
+      - /url: /help
+    - button "Dismiss" [ref=e48] [cursor=pointer]: ×
+  - generic [ref=e52]:
+    - banner [ref=e53]:
+      - generic [ref=e54]:
+        - paragraph [ref=e55]: JobHunt Engine
+        - paragraph [ref=e56]: Fresh Jobs | Company Leads | Lead Connector
+      - generic [ref=e57]:
+        - generic [ref=e58]: 0 / 14 today
+        - generic [ref=e59]: "jobs scraped: 0"
+        - button "Queue Paused" [ref=e60] [cursor=pointer]:
+          - generic [ref=e62]: Queue Paused
+    - generic [ref=e63]:
+      - generic [ref=e65]:
+        - generic [ref=e66]:
+          - heading "Fresh Jobs Portal" [level=2] [ref=e67]
+          - generic [ref=e69]:
+            - generic [ref=e70]:
+              - button "Fresh Jobs (0)" [ref=e71]
+              - button "My Applications (0)" [ref=e72]
+            - generic [ref=e73]:
+              - button "All Time" [ref=e74]
+              - button "Today" [ref=e75]
+              - button "Yesterday" [ref=e76]
+              - button "This Week" [ref=e77]
+            - generic [ref=e78]:
+              - combobox [ref=e79]:
+                - option "All Sources" [selected]
+                - option "Naukri"
+                - option "Linkedin"
+                - option "Cutshort"
+                - option "Instahyre"
+              - combobox [ref=e80]:
+                - option "All quality" [selected]
+                - option "Top match (8+)"
+                - option "Strong match (6+)"
+                - option "Posted < 24h"
+                - option "Remote-first"
+                - option "Startup"
+            - generic [ref=e81]:
+              - 'textbox "Search: title, company, skills…" [ref=e82]'
+              - combobox [ref=e83]:
+                - option "Newest" [selected]
+                - option "Best Score"
+                - option "Company"
+            - generic [ref=e84]:
+              - combobox [ref=e85]:
+                - option "LinkedIn" [selected]
+                - option "Naukri"
+                - option "Cutshort"
+                - option "Instahyre"
+                - option "All portals"
+              - button "Running…" [disabled] [ref=e86]
+              - button "● Status" [ref=e87]
+            - generic [ref=e88]:
+              - 'textbox "Search company: e.g., Google" [ref=e89]'
+              - combobox [ref=e90]:
+                - option "All company portals" [selected]
+                - option "LinkedIn"
+                - option "Naukri"
+                - option "Instahyre"
+              - button "Running…" [disabled] [ref=e91]
+        - generic [ref=e92]:
+          - generic [ref=e96]:
+            - paragraph [ref=e97]: Scanning for jobs…
+            - paragraph [ref=e98]: Chrome extension is browsing job portals in the background. New listings will appear here automatically.
+            - generic [ref=e100]: · linkedin
+          - generic [ref=e103]:
+            - generic [ref=e104]: o
+            - paragraph [ref=e105]: No jobs yet. Pick a source above and click ⚡ Scrape.
+      - generic [ref=e107]:
+        - generic [ref=e108]:
+          - heading "Company Leads" [level=2] [ref=e109]
+          - generic [ref=e111]:
+            - generic [ref=e112]:
+              - button "All Time" [ref=e113]
+              - button "Today" [ref=e114]
+              - button "Yesterday" [ref=e115]
+              - button "This Week" [ref=e116]
+            - generic [ref=e117]:
+              - combobox [ref=e118]:
+                - option "All Jobs" [selected]
+              - combobox [ref=e119]:
+                - option "All Categories" [selected]
+                - option "Hiring Managers"
+                - option "Senior Engineers"
+                - option "Recruiters"
+                - option "Peers"
+        - generic [ref=e121]:
+          - generic [ref=e122]: o
+          - paragraph [ref=e123]: No leads yet. Click Find Leads on jobs in Fresh Jobs Portal.
+      - generic [ref=e125]:
+        - generic [ref=e126]:
+          - heading "Lead Connector" [level=2] [ref=e127]
+          - generic [ref=e129]:
+            - generic [ref=e130]:
+              - button "Start Queue" [ref=e131]:
+                - img [ref=e132]
+                - text: Start Queue
+              - generic [ref=e134]: 0 / 14 today
+            - generic [ref=e135]:
+              - generic [ref=e136]: Daily cap
+              - spinbutton [ref=e137]: "14"
+              - button "Save" [ref=e138]
+            - generic [ref=e139]:
+              - button "All" [ref=e140]
+              - button "Pending" [ref=e141]
+              - button "Sent" [ref=e142]
+              - button "Failed" [ref=e143]
+              - button "Add" [ref=e144]:
+                - img [ref=e145]
+                - text: Add
+        - article [ref=e149]:
+          - generic [ref=e150]:
+            - generic [ref=e151]: TP
+            - generic [ref=e152]:
+              - paragraph [ref=e154]: Test Person
+              - paragraph [ref=e155]: Eng | Acme
+          - generic [ref=e157]: Pending
+          - generic [ref=e158]:
+            - link "Profile" [ref=e159] [cursor=pointer]:
+              - /url: https://linkedin.com/in/some-test
+              - img [ref=e160]
+              - text: Profile
+            - button "Skip" [ref=e164]:
+              - img [ref=e165]
+              - text: Skip

@@ -1,0 +1,44 @@
+{
+  "manifest_version": 3,
+  "name": "JobHunt Engine",
+  "version": "1.0.0",
+  "description": "Job hunt automation tool",
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "storage",
+    "tabs",
+    "alarms",
+    "identity"
+  ],
+  "host_permissions": [
+    "https://www.linkedin.com/*",
+    "https://www.naukri.com/*",
+    "https://cutshort.io/*",
+    "https://instahyre.com/*",
+    "https://www.instahyre.com/*",
+    "https://jobhuntpro-linkedin-api.onrender.com/*",
+    "https://jobhuntpro-cold-api.onrender.com/*",
+    "https://jobhuntpro-frontend.vercel.app/*",
+    "http://localhost:3001/*",
+    "http://localhost:8000/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://jobhuntpro-frontend.vercel.app/*"],
+      "js": ["content/token_sync.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  }
+}
