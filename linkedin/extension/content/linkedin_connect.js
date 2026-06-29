@@ -492,7 +492,13 @@ function getSendInviteModal() {
 }
 
 function hasEmailGate() {
-  return !!document.querySelector('[role="dialog"] input[type="email"], .artdeco-modal input[type="email"], [role="dialog"] input[name="email"], .artdeco-modal input[name="email"]');
+  const dialog = document.querySelector('[role="dialog"], .artdeco-modal');
+  if (!dialog || !isElementVisible(dialog)) return false;
+  if (dialog.querySelector('input[type="email"], input[name="email"], input[id*="email" i], input[name*="email" i]')) return true;
+  // Some variants use a plain text input with an "email to verify" prompt.
+  const txt = normalizeText(dialog.textContent || "").toLowerCase();
+  if (/enter .{0,16}email|email .{0,10}to connect|to verify .{0,30}member|please enter .{0,20}email/.test(txt)) return true;
+  return false;
 }
 
 async function handleConnectModal() {
