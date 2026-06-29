@@ -3,7 +3,7 @@
 // Scrapers read window.__jhJobFilter.* and keep their own keyword matching.
 
 window.__jhJobFilter = (function () {
-  const FRESH_DAYS = 2; // only keep jobs posted within this many days
+  const FRESH_DAYS = 1; // only keep very fresh jobs (~last 24h)
 
   // Titles to drop: too senior, numbered levels, and off-target domains
   // (cloud / validation / hardware / QA / support / network / systems, etc.).
@@ -68,9 +68,15 @@ window.__jhJobFilter = (function () {
 
   function isFreshWithin(parsedTs) {
     if (parsedTs == null) return true; // unknown date — keep (most old jobs now parse)
-    // Half-day buffer so "2 days ago" counts as within-2-days, "3 days ago" doesn't.
-    return (Math.floor(Date.now() / 1000) - parsedTs) < (FRESH_DAYS * 86400 + 43200);
+    // ~30h window: keeps "today", "X hours ago", "yesterday"/"1 day ago";
+    // drops anything 2+ days old.
+    return (Math.floor(Date.now() / 1000) - parsedTs) < (FRESH_DAYS * 86400 + 21600);
   }
 
-  return { FRESH_DAYS, isExcludedTitle, tooMuchExperience, parsePostedAt, isFreshWithin };
+  // LinkedIn "Reposted …" = a recycled/stale listing — treat as not fresh.
+  function looksReposted(text) {
+    return /reposted/i.test(text || "");
+  }
+
+  return { FRESH_DAYS, isExcludedTitle, tooMuchExperience, parsePostedAt, isFreshWithin, looksReposted };
 })();
