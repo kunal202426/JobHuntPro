@@ -41,6 +41,8 @@ export function useQueue() {
     try {
       await client.patch(`/api/queue/${id}/status`, { status: "pending" });
       setQueue(prev => prev.map(p => p.id === id ? { ...p, status: "pending", error_msg: null } : p));
+      // Nudge the extension to process now (if the queue is running).
+      try { window.dispatchEvent(new CustomEvent("jh:trigger-connect")); } catch {}
     } catch {
       toast.error("Failed to retry");
     }
@@ -60,6 +62,8 @@ export function useQueue() {
     try {
       await client.post("/api/queue/start");
       setRunning(true);
+      // Kick the extension immediately instead of waiting for its 30s alarm.
+      try { window.dispatchEvent(new CustomEvent("jh:trigger-connect")); } catch {}
     } catch {
       toast.error("Failed to start queue");
     }

@@ -160,11 +160,26 @@ function robustClick(el) {
     target.dispatchEvent(new MouseEvent("mouseup", opts));
     target.dispatchEvent(new MouseEvent("click", opts));
   } catch (e) { /* ignore */ }
-  // Native click as last resort — but NOT on links, where it would force a full
-  // page navigation to the href instead of letting LinkedIn's SPA open the modal.
-  const isAnchor = target.tagName === "A" || (target.closest && target.closest("a[href]"));
-  if (!isAnchor) { try { target.click(); } catch (e) { /* ignore */ } }
+  // Native click triggers LinkedIn's real handler. For menu links that would
+  // also navigate to the href — callers wrap this in withNavigationGuard() to
+  // cancel that navigation while still letting the handler open the modal.
+  try { target.click(); } catch (e) { /* ignore */ }
   return true;
+}
+
+// Run a click while cancelling any resulting navigation to a LinkedIn invite
+// link, so the SPA opens the "Send invitation" modal in place instead of
+// loading the /preload/custom-invite URL as a full page.
+function withNavigationGuard(fn) {
+  const guard = (e) => {
+    try {
+      const a = e.target && e.target.closest && e.target.closest('a[href*="custom-invite" i], a[href*="/preload/" i]');
+      if (a) e.preventDefault();
+    } catch (err) { /* ignore */ }
+  };
+  document.addEventListener("click", guard, true);
+  try { fn(); }
+  finally { setTimeout(() => { try { document.removeEventListener("click", guard, true); } catch (e) {} }, 80); }
 }
 
 function getProfileTopCard() {
@@ -417,7 +432,8 @@ async function tryMoreActionsConnect() {
       // the invite modal rather than navigating to the custom-invite href.
       const inner = connectEl.querySelector && connectEl.querySelector('[aria-label*="to connect" i]');
       const btn = inner || connectEl;
-      robustClick(btn);
+      // Real click (opens the invite modal) but cancel the link navigation.
+      withNavigationGuard(() => robustClick(btn));
       return { element: btn, followOnly: false };
     }
 
@@ -433,82 +449,68 @@ async function tryMoreActionsConnect() {
   return { element: null, followOnly: false };
 }
 
-async function handleConnectModal() {
-  const TIMEOUT_MS = 20000;
-  const start = Date.now();
-
-  // Helper: if the profile shows Pending/Message, consider it successful
-  function detectConnectionSuccess() {
-    if (isPending()) return true;
-    if (isAlreadyConnected()) return true;
-    const top = getProfileTopCard();
-    if (!top) return false;
-    // look for Message button or Pending label in top card
-    const msg = top.querySelector('button[aria-label*="Message"], a[aria-label*="Message"]');
-    if (msg) return true;
-    const pendingText = Array.from(top.querySelectorAll('button, span, div')).some(el => /pending/i.test(normalizeText(el.textContent || '')));
-    if (pendingText) return true;
-    return false;
+// STRICT success: an invite is only "sent" if we see a positive signal —
+// a Pending state or LinkedIn's "Invitation sent" toast. A Message button is
+// NOT proof (you can message non-connections on the new UI), so we never use it.
+function inviteSucceeded() {
+  if (isPending()) return true;
+  const toasts = Array.from(document.querySelectorAll(
+    '[role="alert"], [aria-live="polite"], [aria-live="assertive"], .artdeco-toast-item, .artdeco-toast, [data-test-artdeco-toast-item]'
+  ));
+  for (const t of toasts) {
+    if (!isElementVisible(t)) continue;
+    const txt = normalizeText(t.textContent || "").toLowerCase();
+    if (/invitation (sent|to)|invite sent|pending|connection request/.test(txt)) return true;
   }
+  return false;
+}
+
+async function confirmInvite(maxMs = 4000) {
+  const start = Date.now();
+  while (Date.now() - start < maxMs) {
+    if (inviteSucceeded()) return true;
+    await sleep(400);
+  }
+  return inviteSucceeded();
+}
+
+async function handleConnectModal() {
+  const TIMEOUT_MS = 18000;
+  const start = Date.now();
+  let clickedSend = false;
 
   while (Date.now() - start < TIMEOUT_MS) {
-    // If connect resulted in immediate DOM change, treat as sent
-    if (detectConnectionSuccess()) return "sent";
+    if (inviteSucceeded()) return "sent";
 
-    // Some LinkedIn variants render the button outside an obvious modal container.
-    const globalSendWithoutNoteBtn = findSendWithoutNoteButtonDeep();
-    if (globalSendWithoutNoteBtn) {
-      robustClick(globalSendWithoutNoteBtn);
-      await sleep(900);
-      if (detectConnectionSuccess()) return "sent";
-      return "sent";
+    // "How do you know X?" email-gated modal — too risky, abort cleanly.
+    const dialog = document.querySelector('[role="dialog"], .artdeco-modal');
+    if (dialog && dialog.querySelector('input[name="email"], input[type="email"]')) {
+      const closeBtn = dialog.querySelector(
+        'button[aria-label="Dismiss"], button[aria-label="Cancel"], button[aria-label*="close" i], [aria-label="Dismiss"]'
+      );
+      if (closeBtn) robustClick(closeBtn);
+      return "email_required";
     }
 
-    const modal = document.querySelector('[role="dialog"], .artdeco-modal, .artdeco-modal__content');
-    if (modal) {
-      const sendWithoutNoteBtn = findSendWithoutNoteButton(modal) || findSendWithoutNoteButtonDeep();
-      if (sendWithoutNoteBtn) {
-        robustClick(sendWithoutNoteBtn);
-        await sleep(900);
-        if (detectConnectionSuccess()) return "sent";
-        return "sent";
-      }
-      // "How do you know X?" with email field — too risky, abort
-      if (modal.querySelector('input[name="email"]')) {
-        const closeBtn = modal.querySelector(
-          'button[aria-label="Dismiss"], button[aria-label="Cancel"], button[aria-label*="close" i]'
-        );
-        if (closeBtn) closeBtn.click();
-        return "email_required";
-      }
-
-      // "Send without a note" or "Send now"
-      const buttons = Array.from(modal.querySelectorAll("button, div[role=button], a[role=button], span"));
-      const sendBtn = buttons.find(btn => {
-        const text = (btn.textContent || "").trim();
-        const label = btn.getAttribute ? (btn.getAttribute("aria-label") || "") : "";
-        return /send without a note|send now|send invitation|send/i.test(text)
-          || /send without a note/i.test(label)
-          || /^connect$/i.test(text)
-          || /\bconnect\b/i.test(label);
-      });
-
-      if (sendBtn) {
-        try { sendBtn.click(); } catch (e) { /* ignore */ }
-        await sleep(900);
-        // If clicking produced a DOM change, treat as sent
-        if (detectConnectionSuccess()) return "sent";
-        return "sent"; // assume sent if button was clicked
-      }
+    // Find and click "Send without a note" (works whether it's a button or a div,
+    // inside a modal or rendered loose), then VERIFY before claiming success.
+    const sendBtn = findSendWithoutNoteButtonDeep();
+    if (sendBtn) {
+      robustClick(sendBtn);
+      clickedSend = true;
+      if (await confirmInvite(5000)) return "sent";
+      // clicked but couldn't confirm — fall through to retry within the loop
     }
+
     await sleep(350);
   }
-  // final check before timing out
-  if (detectConnectionSuccess()) return "sent";
+
+  if (inviteSucceeded()) return "sent";
   try {
-    console.warn("[LinkedIn Connect] modal_timeout debug candidates:", collectActionButtonDebug());
+    console.warn("[LinkedIn Connect] timeout debug candidates:", collectActionButtonDebug());
   } catch (e) { /* ignore */ }
-  return "modal_timeout";
+  // Be honest: clicked Send but no confirmation vs. never found the modal at all.
+  return clickedSend ? "send_unconfirmed" : "modal_timeout";
 }
 
 async function attemptConnect(profile_url) {

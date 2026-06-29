@@ -31,6 +31,11 @@
     chrome.runtime.sendMessage({ type: "TRIGGER_SCRAPE_NOW" });
   });
 
+  // Same for the connect queue (Start Queue / Retry) — start without waiting.
+  window.addEventListener('jh:trigger-connect', () => {
+    chrome.runtime.sendMessage({ type: "TRIGGER_CONNECT_NOW" });
+  });
+
   window.addEventListener("jh:auth-sync", (event) => {
     syncTokenState(event.detail?.token ?? null);
   });

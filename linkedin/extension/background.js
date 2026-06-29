@@ -99,6 +99,23 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     sendResponse({ ok: true });
   }
 
+  if (message.type === "TRIGGER_CONNECT_NOW") {
+    // Dashboard clicked Start Queue / Retry — kick the loop immediately instead
+    // of waiting for the 30s alarm.
+    hasActiveSession()
+      .then(async (active) => {
+        if (!active) return sendResponse({ ok: false, error: "Session inactive" });
+        await syncRunState();
+        if (!_connectLoopRunning) {
+          _connectLoopRunning = true;
+          runConnectLoop().finally(() => { _connectLoopRunning = false; });
+        }
+        sendResponse({ ok: true });
+      })
+      .catch(err => sendResponse({ ok: false, error: err.message }));
+    return true; // async
+  }
+
   if (message.type === "FIND_LEADS") {
     const { company, job_id } = message.payload;
     hasActiveSession()
@@ -411,11 +428,13 @@ ensureCoreAlarm().catch(() => {});
 // ── Helpers ────────────────────────────────────────────────────────────────
 
 async function hasActiveSession() {
-  const [syncData, localData] = await Promise.all([
-    chrome.storage.sync.get("jh_token"),
-    chrome.storage.local.get(SESSION_ACTIVE_KEY),
-  ]);
-  return Boolean(syncData.jh_token && localData[SESSION_ACTIVE_KEY]);
+  // The auth token (storage.sync) is the single source of truth and survives
+  // extension reloads. We intentionally do NOT also require SESSION_ACTIVE_KEY —
+  // that flag is cleared on every reload, which used to silently kill the queue
+  // until the dashboard was refreshed. Signing out removes the token, which
+  // correctly deactivates everything.
+  const syncData = await chrome.storage.sync.get("jh_token");
+  return Boolean(syncData.jh_token);
 }
 
 async function deactivateSession() {

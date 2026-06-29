@@ -100,7 +100,9 @@
 | 5.3 | Cold API (Render) | LIVE — /health 200 | ✅ | https://jobhuntpro-cold-api.onrender.com |
 | 5.4 | LinkedIn API (Render) | LIVE — /health 200 | ✅ | https://jobhuntpro-linkedin-api.onrender.com |
 | 5.5 | Frontend (Vercel) | import repo, set VITE_* env vars | 🔨 | uses vercel.json; planned URL confirmed |
-| 5.6 | Extension | load unpacked, verify popup login + URLs | ⏳ | popup.js updated to NEW Google client ID |
+| 5.6 | Extension | URLs + Google client updated; bundled zip rebuilt & live; token-sync connect works | ✅ | Loads via Settings download or unpacked folder |
+
+**Extension fixes (2026-06-24):** connected via website token-sync (popup Google login optional). Scraping verified working. LinkedIn auto-connect reworked for the new profile UI — scopes the correct "More ⋯" menu (was opening post menus), pointer-event clicks, avoids custom-invite navigation, `<div>` "Send without a note". Bundled `extension.zip` rebuilt + deployed.
 
 **New Google OAuth client (2026-06-24):** `423029767273-arma4d61l5ktli5gutmdgdee5krqpqm9.apps.googleusercontent.com` — used in frontend env, cold env, extension popup.js.
 
