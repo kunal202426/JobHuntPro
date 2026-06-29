@@ -126,6 +126,7 @@ export default function FreshJobsPortal() {
   const [sortBy,        setSortBy]        = useState("newest");
   const [dateFilter,    setDateFilter]    = useState("all");
 
+  const [showFilters,        setShowFilters]        = useState(false);
   const [scrapeSource,       setScrapeSource]       = useState("linkedin");
   const [scrapeBusy,         setScrapeBusy]         = useState(false);
   const [cleanupBusy,        setCleanupBusy]        = useState(false);
@@ -307,6 +308,18 @@ export default function FreshJobsPortal() {
         ))}
       </div>
 
+      {/* ── Filters toggle ─────────────────────────────── */}
+      <button
+        onClick={() => setShowFilters((v) => !v)}
+        className="flex w-full items-center justify-between rounded-lg border border-stone-200 bg-stone-50 px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:bg-stone-100"
+      >
+        <span>{showFilters ? "▾ Hide filters & search" : "▸ Filters & search"}</span>
+        {!showFilters && (dateFilter !== "all" || sourceFilter !== "all" || smartFilter !== "all" || search.trim()) && (
+          <span className="rounded-full bg-sky-600 px-1.5 py-0.5 text-[10px] text-white">active</span>
+        )}
+      </button>
+
+      {showFilters && (<>
       {/* ── Date filter ────────────────────────────────── */}
       <div className="flex gap-1 flex-wrap">
         {DATE_FILTERS.map((df) => (
@@ -367,6 +380,7 @@ export default function FreshJobsPortal() {
           <option value="company">Company</option>
         </select>
       </div>
+      </>)}
 
       {/* ── Scrape row — ALWAYS VISIBLE ────────────────── */}
       <div className="flex items-center gap-2">
