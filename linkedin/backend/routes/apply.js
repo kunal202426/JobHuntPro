@@ -87,7 +87,7 @@ router.post("/result", async (req, res) => {
   try {
     const { id, job_id, status, error_msg } = req.body;
     if (!id) return res.status(400).json({ error: "id required" });
-    const valid = ["applied", "already_applied", "failed", "skipped"];
+    const valid = ["applied", "already_applied", "failed", "skipped", "discarded"];
     if (!valid.includes(status)) return res.status(400).json({ error: "invalid status" });
 
     const norm = (status === "applied" || status === "already_applied") ? "done" : status;
@@ -97,6 +97,10 @@ router.post("/result", async (req, res) => {
     );
     if ((status === "applied" || status === "already_applied") && job_id) {
       await execute("UPDATE jobs SET status='applied' WHERE id=$1 AND user_id=$2", [job_id, req.userId]);
+    }
+    // Unfit (too senior / >2 yrs experience, detected on the detail page) — delete it.
+    if (status === "discarded" && job_id) {
+      await execute("DELETE FROM jobs WHERE id=$1 AND user_id=$2", [job_id, req.userId]);
     }
     res.json({ ok: true });
   } catch (err) {
