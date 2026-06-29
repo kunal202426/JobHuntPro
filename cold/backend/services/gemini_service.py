@@ -196,19 +196,15 @@ def _build_cold_signal(u: dict) -> str:
     name     = u.get("full_name") or "The Sender"
     phone    = u.get("phone") or ""
     port     = u.get("portfolio_url") or ""
-    linkedin = u.get("linkedin_url") or ""
 
-    lines = ["Would love to explore opportunities or get a referral in your company."]
-    if port or linkedin:
+    lines = ["If your team is hiring, I'd really appreciate any guidance or a referral. Happy to share my resume if helpful."]
+    if port:
         lines.append("\nCheck my work at:")
-        if port:
-            lines.append(port)
-        if linkedin:
-            lines.append(linkedin)
-    contact = f"\n~ {name}"
+        lines.append(port)
+    lines.append("\nThanks!")
+    lines.append(name)
     if phone:
-        contact += f" | {phone}"
-    lines.append(contact)
+        lines.append(phone)
     return "\n".join(lines)
 
 
@@ -239,17 +235,24 @@ If no name is given, write: Hi there,
 SUBJECT LINE:
 Format: "SDE roles at [Company Name]" OR "Application at [Company Name]".
 
-STRUCTURE (2 paragraphs only):
+TONE: warm, humble, and conversational — like a real person reaching out, not a
+formal job application. Use plain, friendly language. Avoid corporate buzzwords,
+"seeking", "aligns well", "demonstrates my capability", or boastful phrasing.
+
+STRUCTURE (2 short paragraphs only):
 Paragraph 1 — INTRO:
-    ONE sentence. Introduce {name}, mention their current role ({current_role} at {current_co}), state they are looking for {target} from {grad} and interested in [Company].
+    1-2 sentences, natural and warm. Pattern: "I'm {name}, currently working as
+    {current_role} at {current_co}. I'm looking for {target} starting {grad} and
+    came across [Company]." (rephrase naturally; don't sound robotic).
 
 Paragraph 2 — WHY FIT:
-    2 sentences. Start with the company's domain or product, then connect to {name}'s most relevant work.
-    Use ONE concrete detail from background/projects/notes if available (e.g., "building production features for a high-throughput trading platform").
-    Keep it human and specific; avoid generic corporate buzzwords.
+    1-2 sentences. Warmly say what you like about what [Company] builds (their
+    domain/product), then: "I believe my experience with [list 2-4 concrete
+    skills/tech drawn from background/projects, e.g. React, Node.js, ML-powered
+    apps, distributed systems] would be a good fit." Keep it genuine and modest.
 
 HARD RULES:
-- 90-130 words body MAX (excluding signal)
+- 70-110 words body MAX (excluding signal) — keep it short and easy to read
 - Company name must appear at least once
 - Exactly 2 paragraphs, one blank line between them
 - No em dashes (—)
