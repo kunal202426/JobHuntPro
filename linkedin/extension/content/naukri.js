@@ -86,6 +86,7 @@ function isSeniorTitle(title) {
 
 function isRelevant(title) {
   const lower = normalizeText(title);
+  if (window.__jhJobFilter && window.__jhJobFilter.isExcludedTitle(title)) return false;
   if (isSeniorTitle(lower)) return false;
   return matchesKeywords(lower);
 }
@@ -104,39 +105,21 @@ function parseMinExperienceYears(text) {
 }
 
 function isExperienceAllowed(text) {
+  if (window.__jhJobFilter) return !window.__jhJobFilter.tooMuchExperience(text);
   const minYears = parseMinExperienceYears(text);
   if (minYears === null) return true;
   return minYears <= MAX_EXPERIENCE_YEARS;
 }
 
 function parsePostedAt(text) {
-  if (!text) return { raw: null, parsed: null };
-  const lower = text.toLowerCase().trim();
-  const now = Date.now();
-
-  if (lower.includes("just now") || lower.includes("few minute")) {
-    return { raw: text, parsed: Math.floor(now / 1000) };
-  }
-  const hoursMatch = lower.match(/(\d+)\s*hour/);
-  if (hoursMatch) {
-    return { raw: text, parsed: Math.floor((now - parseInt(hoursMatch[1]) * 3600000) / 1000) };
-  }
-  if (lower === "today" || lower === "1 day ago") {
-    return { raw: text, parsed: Math.floor(now / 1000) };
-  }
-  if (lower === "yesterday") {
-    return { raw: text, parsed: Math.floor((now - 86400000) / 1000) };
-  }
-  const daysMatch = lower.match(/(\d+)\s*day/);
-  if (daysMatch) {
-    return { raw: text, parsed: Math.floor((now - parseInt(daysMatch[1]) * 86400000) / 1000) };
-  }
-  return { raw: text, parsed: null };
+  if (window.__jhJobFilter) return window.__jhJobFilter.parsePostedAt(text);
+  return { raw: text || null, parsed: null };
 }
 
 function isFresh(parsedTs) {
-  if (!parsedTs) return true; // keep if can't parse
-  return (Math.floor(Date.now() / 1000) - parsedTs) < 86400;
+  if (window.__jhJobFilter) return window.__jhJobFilter.isFreshWithin(parsedTs);
+  if (!parsedTs) return true;
+  return (Math.floor(Date.now() / 1000) - parsedTs) < (2 * 86400);
 }
 
 function extractJobCard(card) {

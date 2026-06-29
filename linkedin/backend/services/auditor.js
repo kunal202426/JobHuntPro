@@ -47,6 +47,11 @@ export function scoreJob(job) {
     return { score: 1, reason: "too senior", keep: false };
   }
 
+  // Off-target domains that don't match a software/full-stack/AI profile.
+  if (/\bcloud\b|\bvalidation\b|\bsilicon\b|\bhardware\b|\bembedded\b|\bfirmware\b|\bvlsi\b|\brtl\b|\b(qa|sdet)\b|\btest(ing)? engineer\b|\bsupport engineer\b|\bnetwork engineer\b|\bsystems? engineer\b|\bautomation engineer\b/.test(title)) {
+    return { score: 0, reason: "off-target domain", keep: false };
+  }
+
   // Hard reject — role wants MORE than 2 years of experience (e.g. Instahyre's
   // "1-4 Years" field, which the generic regex below may not catch).
   const expField = (job.experience_required || "").toLowerCase();

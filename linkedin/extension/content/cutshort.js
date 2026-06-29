@@ -8,45 +8,19 @@ const TECH_KEYWORDS = [
 
 function isRelevant(title) {
   const lower = (title || "").toLowerCase();
-  return TECH_KEYWORDS.some(kw => lower.includes(kw));
+  if (window.__jhJobFilter && window.__jhJobFilter.isExcludedTitle(title)) return false;
+  return TECH_KEYWORDS.some(kw => lower.includes(kw.toLowerCase()));
 }
 
 function parsePostedAt(text) {
-  if (!text) return { raw: null, parsed: null };
-  const lower = text.toLowerCase().trim();
-  const now = Date.now();
-
-  if (lower.includes("just now") || lower.includes("few minute")) {
-    return { raw: text, parsed: Math.floor(now / 1000) };
-  }
-  const minutesMatch = lower.match(/(\d+)\s*minute/);
-  if (minutesMatch) {
-    return { raw: text, parsed: Math.floor((now - parseInt(minutesMatch[1]) * 60000) / 1000) };
-  }
-  const hoursMatch = lower.match(/(\d+)\s*hour/);
-  if (hoursMatch) {
-    return { raw: text, parsed: Math.floor((now - parseInt(hoursMatch[1]) * 3600000) / 1000) };
-  }
-  if (lower === "today" || lower.includes("1 day ago")) {
-    return { raw: text, parsed: Math.floor(now / 1000) };
-  }
-  if (lower.includes("yesterday")) {
-    return { raw: text, parsed: Math.floor((now - 86400000) / 1000) };
-  }
-  const daysMatch = lower.match(/(\d+)\s*day/);
-  if (daysMatch) {
-    return { raw: text, parsed: Math.floor((now - parseInt(daysMatch[1]) * 86400000) / 1000) };
-  }
-  const weeksMatch = lower.match(/(\d+)\s*week/);
-  if (weeksMatch) {
-    return { raw: text, parsed: Math.floor((now - parseInt(weeksMatch[1]) * 7 * 86400000) / 1000) };
-  }
-  return { raw: text, parsed: null };
+  if (window.__jhJobFilter) return window.__jhJobFilter.parsePostedAt(text);
+  return { raw: text || null, parsed: null };
 }
 
 function isFresh(parsedTs) {
+  if (window.__jhJobFilter) return window.__jhJobFilter.isFreshWithin(parsedTs);
   if (!parsedTs) return true;
-  return (Math.floor(Date.now() / 1000) - parsedTs) < 86400;
+  return (Math.floor(Date.now() / 1000) - parsedTs) < (2 * 86400);
 }
 
 // Detect startup signals from card text/metadata

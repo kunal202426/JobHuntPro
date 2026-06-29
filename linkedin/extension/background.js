@@ -427,7 +427,10 @@ async function runScrapeTask(task) {
 
   try {
     await new Promise((resolve) => {
-      chrome.scripting.executeScript({ target: { tabId: targetTab.id }, files: [cfg.injectFile] }, () => resolve());
+      chrome.scripting.executeScript(
+        { target: { tabId: targetTab.id }, files: ["content/job_match.js", cfg.injectFile] },
+        () => resolve()
+      );
     });
   } catch (err) {
     return { status: "failed", message: `Failed to start scraper on ${source}` };

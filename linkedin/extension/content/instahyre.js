@@ -28,18 +28,16 @@
     return EXCLUDE_TITLE_PATTERNS.some((re) => re.test(title || ""));
   }
 
-  // Discard if the role wants MORE than 2 years of experience.
-  // "1-4 Years" → max 4 > 2 → discard. "0-2 Years" → keep. "2+ years" → discard.
+  // Discard if the role wants MORE than 2 years of experience (delegates to the
+  // shared filter; falls back to a local copy if it isn't injected).
   function tooMuchExperience(expText) {
+    if (window.__jhJobFilter) return window.__jhJobFilter.tooMuchExperience(expText);
     if (!expText) return false;
     const lower = expText.toLowerCase();
     const nums = (lower.match(/\d+/g) || []).map(Number);
     if (nums.length === 0) return false;
     const maxYear = Math.max(...nums);
-    const hasPlus = /\d+\s*\+/.test(lower);
-    if (maxYear > 2) return true;
-    if (hasPlus && maxYear >= 2) return true; // "2+ years" etc.
-    return false;
+    return maxYear > 2 || (/\d+\s*\+/.test(lower) && maxYear >= 2);
   }
 
   const seenUrls = new Set();
@@ -72,46 +70,20 @@
 
   function isRelevant(title) {
     const lower = (title || "").toLowerCase();
+    if (window.__jhJobFilter && window.__jhJobFilter.isExcludedTitle(title)) return false;
     if (isSeniorTitle(lower)) return false;
     return TECH_KEYWORDS.some((kw) => lower.includes(kw));
   }
 
   function parsePostedAt(text) {
-    if (!text) return { raw: null, parsed: null };
-    const lower = text.toLowerCase().trim();
-    const now = Date.now();
-
-    if (lower.includes("just now") || lower.includes("few minute")) {
-      return { raw: text, parsed: Math.floor(now / 1000) };
-    }
-    const minutesMatch = lower.match(/(\d+)\s*minute/);
-    if (minutesMatch) {
-      return { raw: text, parsed: Math.floor((now - parseInt(minutesMatch[1], 10) * 60000) / 1000) };
-    }
-    const hoursMatch = lower.match(/(\d+)\s*hour/);
-    if (hoursMatch) {
-      return { raw: text, parsed: Math.floor((now - parseInt(hoursMatch[1], 10) * 3600000) / 1000) };
-    }
-    if (lower === "today" || lower.includes("1 day ago")) {
-      return { raw: text, parsed: Math.floor(now / 1000) };
-    }
-    if (lower.includes("yesterday")) {
-      return { raw: text, parsed: Math.floor((now - 86400000) / 1000) };
-    }
-    const daysMatch = lower.match(/(\d+)\s*day/);
-    if (daysMatch) {
-      return { raw: text, parsed: Math.floor((now - parseInt(daysMatch[1], 10) * 86400000) / 1000) };
-    }
-    const weeksMatch = lower.match(/(\d+)\s*week/);
-    if (weeksMatch) {
-      return { raw: text, parsed: Math.floor((now - parseInt(weeksMatch[1], 10) * 7 * 86400000) / 1000) };
-    }
-    return { raw: text, parsed: null };
+    if (window.__jhJobFilter) return window.__jhJobFilter.parsePostedAt(text);
+    return { raw: text || null, parsed: null };
   }
 
   function isFresh(parsedTs) {
+    if (window.__jhJobFilter) return window.__jhJobFilter.isFreshWithin(parsedTs);
     if (!parsedTs) return true;
-    return (Math.floor(Date.now() / 1000) - parsedTs) < (7 * 86400);
+    return (Math.floor(Date.now() / 1000) - parsedTs) < (2 * 86400);
   }
 
   function getCompanyAndTitle(card) {
