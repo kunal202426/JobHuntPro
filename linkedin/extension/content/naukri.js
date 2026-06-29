@@ -91,6 +91,31 @@ function isRelevant(title) {
   return matchesKeywords(lower);
 }
 
+// Apply Naukri's own "Freshness → Last 1 day" server-side filter so the list
+// only ever shows jobs posted in the last 24h. Returns true once applied.
+function applyNaukriFreshness() {
+  if (window.__jhNaukriFreshnessApplied) return true;
+  // Already filtered via URL? then we're done.
+  if (/[?&]jobage=1\b/i.test(location.search) || /freshness-1/i.test(location.href)) {
+    window.__jhNaukriFreshnessApplied = true;
+    return true;
+  }
+  let opt = document.querySelector('a[data-id="filter-freshness-1"]');
+  if (!opt) {
+    // The option lives in a closed dropdown — open it, then look again.
+    const btn = document.querySelector('#filter-freshness');
+    if (btn) btn.click();
+    opt = document.querySelector('a[data-id="filter-freshness-1"]');
+  }
+  if (opt) {
+    window.__jhNaukriFreshnessApplied = true;
+    opt.click();
+    console.log("[Naukri] Applied freshness filter: Last 1 day");
+    return true;
+  }
+  return false;
+}
+
 function parseMinExperienceYears(text) {
   if (!text) return null;
   const lower = normalizeText(text);
@@ -261,8 +286,16 @@ function debouncedScrape() {
   debounceTimer = setTimeout(() => sendJobs(scrapeAllCards()), 2000);
 }
 
-// Initial scrape after page idle
-debouncedScrape();
+// Apply Naukri's "Last 1 day" freshness filter first, THEN scrape only those.
+let _freshTries = 0;
+const _freshTimer = setInterval(() => {
+  _freshTries++;
+  if (applyNaukriFreshness() || _freshTries > 8) {
+    clearInterval(_freshTimer);
+    // Let Naukri reload the filtered results before scraping.
+    setTimeout(() => { debouncedScrape(); startAutoScroll(); }, 2200);
+  }
+}, 600);
 
 // Watch for lazy-loaded cards
 const listTarget =
@@ -421,8 +454,6 @@ function startAutoScroll() {
     }, 600);
   }, AUTO_SCROLL_INTERVAL_MS);
 }
-
-setTimeout(startAutoScroll, 2000);
 
 let autoScrollTimer = null;
 function stopAutoScroll(reason) {
