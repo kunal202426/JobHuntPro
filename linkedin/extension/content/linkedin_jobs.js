@@ -74,6 +74,12 @@ const EXCLUDE_TITLE_PATTERNS = [
   /\bcpo\b/i,
   /\bfounder\b/i,
   /\bco[-\s]?founder\b/i,
+  // Numbered senior levels — SDE 2/3, SDE II/III, Engineer II, Developer 3, Level 3, etc.
+  // (SDE 1 / SDE I / unnumbered stay, since those are junior-friendly.)
+  /\b(sde|swe|sse|mts)[-\s]?(2|3|4|5|ii|iii|iv|v)\b/i,
+  /\b(software\s+|backend\s+|frontend\s+|full[-\s]?stack\s+)?(engineer|developer|programmer)[-\s]+(2|3|4|5|ii|iii|iv|v)\b/i,
+  /\blevel[-\s]?(2|3|4|5)\b/i,
+  /\bgrade[-\s]?(2|3|4|5)\b/i,
 ];
 
 function normalizeText(text) {
@@ -139,6 +145,11 @@ function isFresh(parsedTs) {
 
 function extractJobCard(card) {
   try {
+    // Skip listings that are closed / no longer accepting applicants.
+    if (/no longer accepting applications|applications are closed|this job is no longer/i.test(card.textContent || "")) {
+      return null;
+    }
+
     // Title — multiple fallback selectors for LinkedIn's shifting DOM
     const titleEl =
       card.querySelector("a.job-card-list__title--link") ||

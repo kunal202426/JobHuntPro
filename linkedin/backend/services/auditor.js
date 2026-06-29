@@ -38,6 +38,14 @@ export function scoreJob(job) {
   if (REJECT_TITLES.some(k => title.includes(k)))
     return { score: 0, reason: "non-tech role", keep: false };
 
+  // Hard reject — numbered senior levels (SDE 2/3, Engineer II/III, Level 3, …).
+  // SDE 1 / SDE I / unnumbered titles are kept.
+  if (/\b(sde|swe|sse|mts)[-\s]?(2|3|4|5|ii|iii|iv|v)\b/.test(title)
+      || /\b(engineer|developer|programmer)[-\s]+(2|3|4|5|ii|iii|iv|v)\b/.test(title)
+      || /\blevel[-\s]?(2|3|4|5)\b/.test(title)) {
+    return { score: 1, reason: "too senior (numbered level)", keep: false };
+  }
+
   let score = 5;
 
   // Title signals

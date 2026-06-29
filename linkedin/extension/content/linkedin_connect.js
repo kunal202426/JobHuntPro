@@ -425,6 +425,14 @@ async function tryMoreActionsConnect() {
     const menu = await waitForActionMenu(2500) || findMenuContainer();
     if (!menu) { closeAnyMenu(); await sleep(150); continue; }
 
+    // Already invited? The profile menu shows "Withdraw invitation"/"Pending"
+    // instead of a Connect (custom-invite) item.
+    const menuTxt = normalizeText(menu.textContent || "").toLowerCase();
+    if (/withdraw invitation|pending/.test(menuTxt) && !menu.querySelector('a[href*="custom-invite" i]')) {
+      closeAnyMenu();
+      return { element: null, followOnly: false, pending: true };
+    }
+
     const connectEl = findConnectInMenu(menu);
     if (connectEl) {
       // Prefer the inner labelled element ("Invite … to connect") over the
@@ -449,18 +457,23 @@ async function tryMoreActionsConnect() {
   return { element: null, followOnly: false };
 }
 
-// STRICT success: an invite is only "sent" if we see a positive signal —
-// a Pending state or LinkedIn's "Invitation sent" toast. A Message button is
-// NOT proof (you can message non-connections on the new UI), so we never use it.
+// STRICT success: only the CURRENT person's Pending state counts. We do NOT use
+// the global "Invitation sent" toast — the extension reuses one tab and a toast
+// from a previous person lingers, which caused false positives.
 function inviteSucceeded() {
-  if (isPending()) return true;
-  const toasts = Array.from(document.querySelectorAll(
-    '[role="alert"], [aria-live="polite"], [aria-live="assertive"], .artdeco-toast-item, .artdeco-toast, [data-test-artdeco-toast-item]'
-  ));
-  for (const t of toasts) {
-    if (!isElementVisible(t)) continue;
-    const txt = normalizeText(t.textContent || "").toLowerCase();
-    if (/invitation (sent|to)|invite sent|pending|connection request/.test(txt)) return true;
+  return isPending();
+}
+
+// LinkedIn refused the invite (weekly limit, "moving too fast", upsell, etc.).
+// If this is up after we click Send, the invite did NOT go out.
+function hasInviteBlockedDialog() {
+  const scopes = Array.from(document.querySelectorAll('[role="dialog"], .artdeco-modal, [role="alert"], .artdeco-toast-item'));
+  for (const s of scopes) {
+    if (!isElementVisible(s)) continue;
+    const txt = normalizeText(s.textContent || "").toLowerCase();
+    if (/weekly (invitation|invite) limit|reached the (weekly|monthly)|moving too fast|want to stand out|you('| a)re out of invitations|try again later|upgrade to|premium/.test(txt)) {
+      return true;
+    }
   }
   return false;
 }
@@ -513,15 +526,17 @@ async function handleConnectModal() {
   }
   robustClick(sendBtn);
 
-  // 4) Verify: a success toast/pending state, OR the invite modal CLOSES —
-  // LinkedIn only closes this dialog after the invitation is actually sent.
+  // 4) Verify. The reliable, person-specific signal is the invite modal CLOSING
+  // after we click that person's Send button — LinkedIn only closes it on a real
+  // send. But first rule out a "blocked"/limit dialog or an email gate replacing it.
   while (Date.now() - start < TIMEOUT_MS) {
     await sleep(400);
-    if (inviteSucceeded()) return "sent";
-    if (!getSendInviteModal()) {
-      // Modal gone after we clicked Send. Guard against an email-gate replacing it.
+    if (hasInviteBlockedDialog()) return "invite_blocked";
+    const stillOpen = getSendInviteModal();
+    if (!stillOpen) {
       const emailGate = document.querySelector('[role="dialog"] input[type="email"], .artdeco-modal input[name="email"]');
       if (emailGate) return "email_required";
+      if (hasInviteBlockedDialog()) return "invite_blocked";
       return "sent";
     }
   }
@@ -567,9 +582,10 @@ async function attemptConnect(profile_url) {
     // Case B: Connect lives in the "More" dropdown. tryMoreActionsConnect opens
     // the correct menu and clicks Connect itself (don't click again here).
     const res = await tryMoreActionsConnect();
+    if (res.pending) return { status: "already_pending" };
     if (res.followOnly) return { status: "no_button", error: "follow_only" };
     if (!res.element) {
-      if (isPending()) return { status: "sent" };
+      if (isPending()) return { status: "already_pending" };
       if (isFollowOnly()) return { status: "no_button", error: "follow_only" };
       return { status: "no_button", error: "connect_button_not_found" };
     }
