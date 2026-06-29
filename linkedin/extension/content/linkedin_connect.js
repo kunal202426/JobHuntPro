@@ -465,52 +465,67 @@ function inviteSucceeded() {
   return false;
 }
 
-async function confirmInvite(maxMs = 4000) {
-  const start = Date.now();
-  while (Date.now() - start < maxMs) {
-    if (inviteSucceeded()) return true;
-    await sleep(400);
+// The "Send invitation" dialog: classic artdeco modal (class send-invite), or
+// any visible dialog that contains the Send-without-a-note / Add-a-note actions.
+function getSendInviteModal() {
+  const byClass = document.querySelector(".artdeco-modal.send-invite, [data-test-modal].send-invite");
+  if (byClass && isElementVisible(byClass)) return byClass;
+  const dialogs = Array.from(document.querySelectorAll('[role="dialog"], .artdeco-modal'));
+  for (const d of dialogs) {
+    if (!isElementVisible(d)) continue;
+    if (d.querySelector('[aria-label*="Send without a note" i], [aria-label*="Add a note" i]')) return d;
   }
-  return inviteSucceeded();
+  return null;
 }
 
 async function handleConnectModal() {
-  const TIMEOUT_MS = 18000;
+  const TIMEOUT_MS = 15000;
   const start = Date.now();
-  let clickedSend = false;
 
-  while (Date.now() - start < TIMEOUT_MS) {
+  // 1) Wait for the invite modal to appear (or an immediate pending/toast).
+  let modal = null;
+  while (Date.now() - start < 6000) {
     if (inviteSucceeded()) return "sent";
-
-    // "How do you know X?" email-gated modal — too risky, abort cleanly.
-    const dialog = document.querySelector('[role="dialog"], .artdeco-modal');
-    if (dialog && dialog.querySelector('input[name="email"], input[type="email"]')) {
-      const closeBtn = dialog.querySelector(
-        'button[aria-label="Dismiss"], button[aria-label="Cancel"], button[aria-label*="close" i], [aria-label="Dismiss"]'
-      );
-      if (closeBtn) robustClick(closeBtn);
-      return "email_required";
-    }
-
-    // Find and click "Send without a note" (works whether it's a button or a div,
-    // inside a modal or rendered loose), then VERIFY before claiming success.
-    const sendBtn = findSendWithoutNoteButtonDeep();
-    if (sendBtn) {
-      robustClick(sendBtn);
-      clickedSend = true;
-      if (await confirmInvite(5000)) return "sent";
-      // clicked but couldn't confirm — fall through to retry within the loop
-    }
-
-    await sleep(350);
+    modal = getSendInviteModal();
+    if (modal) break;
+    await sleep(300);
+  }
+  if (!modal) {
+    if (inviteSucceeded()) return "sent";
+    try { console.warn("[LinkedIn Connect] no invite modal appeared — debug:", collectActionButtonDebug()); } catch (e) {}
+    return "modal_timeout";
   }
 
-  if (inviteSucceeded()) return "sent";
-  try {
-    console.warn("[LinkedIn Connect] timeout debug candidates:", collectActionButtonDebug());
-  } catch (e) { /* ignore */ }
-  // Be honest: clicked Send but no confirmation vs. never found the modal at all.
-  return clickedSend ? "send_unconfirmed" : "modal_timeout";
+  // 2) Email-gated "How do you know X?" — too risky, abort cleanly.
+  if (modal.querySelector('input[name="email"], input[type="email"]')) {
+    const closeBtn = modal.querySelector(
+      'button[aria-label="Dismiss"], [aria-label="Dismiss"], button[aria-label*="close" i]'
+    );
+    if (closeBtn) robustClick(closeBtn);
+    return "email_required";
+  }
+
+  // 3) Click "Send without a note".
+  const sendBtn = findSendWithoutNoteButton(modal) || findSendWithoutNoteButtonDeep();
+  if (!sendBtn) {
+    try { console.warn("[LinkedIn Connect] modal open but no Send button — debug:", collectActionButtonDebug()); } catch (e) {}
+    return "send_button_missing";
+  }
+  robustClick(sendBtn);
+
+  // 4) Verify: a success toast/pending state, OR the invite modal CLOSES —
+  // LinkedIn only closes this dialog after the invitation is actually sent.
+  while (Date.now() - start < TIMEOUT_MS) {
+    await sleep(400);
+    if (inviteSucceeded()) return "sent";
+    if (!getSendInviteModal()) {
+      // Modal gone after we clicked Send. Guard against an email-gate replacing it.
+      const emailGate = document.querySelector('[role="dialog"] input[type="email"], .artdeco-modal input[name="email"]');
+      if (emailGate) return "email_required";
+      return "sent";
+    }
+  }
+  return "send_unconfirmed";
 }
 
 async function attemptConnect(profile_url) {
@@ -544,67 +559,27 @@ async function attemptConnect(profile_url) {
   if (isAlreadyConnected()) return { status: "already_connected" };
   if (isPending())           return { status: "sent" };
 
-  // Case A: direct Connect button
-  let connectBtn = findDirectConnectButton();
-  let followOnlyFromMenu = false;
-
-  // Case B: More actions dropdown
-  if (!connectBtn) {
+  // Case A: a directly-visible Connect button (rare on the new UI).
+  const directBtn = findDirectConnectButton();
+  if (directBtn) {
+    withNavigationGuard(() => robustClick(directBtn));
+  } else {
+    // Case B: Connect lives in the "More" dropdown. tryMoreActionsConnect opens
+    // the correct menu and clicks Connect itself (don't click again here).
     const res = await tryMoreActionsConnect();
-    connectBtn = res.element;
-    followOnlyFromMenu = res.followOnly;
+    if (res.followOnly) return { status: "no_button", error: "follow_only" };
+    if (!res.element) {
+      if (isPending()) return { status: "sent" };
+      if (isFollowOnly()) return { status: "no_button", error: "follow_only" };
+      return { status: "no_button", error: "connect_button_not_found" };
+    }
   }
 
-  if (!connectBtn) {
-    // If we already see pending after menu checks, treat it as successful state.
-    if (isPending()) return { status: "sent" };
-    if (followOnlyFromMenu || isFollowOnly()) return { status: "no_button", error: "follow_only" };
-    return { status: "no_button", error: "connect_button_not_found" };
-  }
-
-  robustClick(connectBtn);
-  await sleep(1200);
-
+  // Single place that finds the invite modal, clicks "Send without a note", and
+  // verifies the invite actually went out (modal closes / toast / pending).
   const modalResult = await handleConnectModal();
   if (modalResult === "sent") return { status: "sent" };
-
-  // Fallback: sometimes the "Send without a note" button is outside the modal
-  const findAndClickSendWithoutNote = async () => {
-    // 1) shared exact/contains detection
-    let btn = findSendWithoutNoteButtonDeep();
-
-    // 2) look for span text inside buttons
-    if (!btn) {
-      const spans = Array.from(document.querySelectorAll('span.artdeco-button__text, span'));
-      for (const sp of spans) {
-        if (/send without a note/i.test(normalizeText(sp.textContent || ''))) {
-          btn = sp.closest('button') || sp.parentElement;
-          break;
-        }
-      }
-    }
-
-    // 3) XPath fallback for text node inside a button
-    if (!btn) {
-      try {
-        const xp = document.evaluate("//button[normalize-space(.)[contains(translate(., 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'send without a note')]]", document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null);
-        btn = xp.singleNodeValue;
-      } catch (e) { /* ignore */ }
-    }
-
-    if (!btn) return false;
-
-    // Attempt click; if that doesn't dispatch, send mouse events as fallback
-    robustClick(btn);
-    await sleep(250);
-    if (isPending() || isAlreadyConnected()) return true;
-
-    await sleep(500);
-    return (isPending() || isAlreadyConnected() || !findSendWithoutNoteButton(document));
-  };
-
-  if (await findAndClickSendWithoutNote()) return { status: 'sent' };
-
+  if (modalResult === "email_required") return { status: "no_button", error: "email_required" };
   if (isPending()) return { status: "sent" };
   return { status: "failed", error: modalResult };
 }
