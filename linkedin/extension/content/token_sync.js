@@ -36,6 +36,11 @@
     chrome.runtime.sendMessage({ type: "TRIGGER_CONNECT_NOW" });
   });
 
+  // Instahyre bulk auto-apply.
+  window.addEventListener('jh:trigger-apply', () => {
+    chrome.runtime.sendMessage({ type: "TRIGGER_APPLY_NOW" });
+  });
+
   window.addEventListener("jh:auth-sync", (event) => {
     syncTokenState(event.detail?.token ?? null);
   });

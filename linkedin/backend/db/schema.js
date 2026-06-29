@@ -165,6 +165,22 @@ export async function initDB() {
     )
   `);
 
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS apply_queue (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      job_id TEXT NOT NULL,
+      source TEXT,
+      job_url TEXT NOT NULL,
+      title TEXT,
+      company TEXT,
+      status TEXT DEFAULT 'pending',
+      error_msg TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      processed_at TEXT
+    )
+  `);
+
   // Backfill missing columns on pre-existing tables from the older single-user schema.
   await addColumnIfMissing(client, "jobs", "user_id", "TEXT");
   await addColumnIfMissing(client, "jobs", "notes", "TEXT");

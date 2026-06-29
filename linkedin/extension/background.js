@@ -116,6 +116,21 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true; // async
   }
 
+  if (message.type === "TRIGGER_APPLY_NOW") {
+    // Dashboard clicked "Easy Apply (Instahyre)" — start the apply loop now.
+    hasActiveSession()
+      .then((active) => {
+        if (!active) return sendResponse({ ok: false, error: "Session inactive" });
+        if (!_applyLoopRunning) {
+          _applyLoopRunning = true;
+          runApplyLoop().finally(() => { _applyLoopRunning = false; });
+        }
+        sendResponse({ ok: true });
+      })
+      .catch(err => sendResponse({ ok: false, error: err.message }));
+    return true; // async
+  }
+
   if (message.type === "FIND_LEADS") {
     const { company, job_id } = message.payload;
     hasActiveSession()
@@ -188,6 +203,11 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
   if (!_connectLoopRunning) {
     _connectLoopRunning = true;
     runConnectLoop().finally(() => { _connectLoopRunning = false; });
+  }
+
+  if (!_applyLoopRunning) {
+    _applyLoopRunning = true;
+    runApplyLoop().finally(() => { _applyLoopRunning = false; });
   }
 });
 
@@ -265,6 +285,61 @@ async function runConnectLoop() {
     const result = await processOneConnection();
     if (result !== "done") break;
     await keepAliveDelay(5000);
+  }
+}
+
+// ── Instahyre auto-apply ─────────────────────────────────────────────────────
+let _applyLoopRunning = false;
+
+async function processOneApply() {
+  if (!(await hasActiveSession())) return "stopped";
+
+  const res = await fetchFromBackend("/api/apply/next");
+  if (!res || !res.ok) return "no_item";
+  const task = await res.json().catch(() => null);
+  if (!task || !task.job_url) return "no_item";
+
+  let targetTab;
+  const tabs = await chrome.tabs.query({ url: "https://www.instahyre.com/*", active: false });
+  if (tabs.length > 0) {
+    targetTab = tabs[0];
+    await chrome.tabs.update(targetTab.id, { url: task.job_url });
+  } else {
+    targetTab = await chrome.tabs.create({ url: task.job_url, active: false });
+  }
+
+  await waitForTabLoad(targetTab.id);
+  await new Promise(r => setTimeout(r, 1500));
+
+  if (!(await hasActiveSession())) return "stopped";
+
+  try {
+    const response = await sendMessageToTabWithInjection(targetTab.id, {
+      type: "DO_APPLY",
+      payload: { job_id: task.job_id },
+    }, "content/instahyre_apply.js");
+
+    const status = response?.status || "failed";
+    console.log(`[bg] DO_APPLY result: ${status}`, response?.error || "");
+    await postToBackend("/api/apply/result", {
+      id: task.id, job_id: task.job_id, status, error_msg: response?.error || null,
+    }).catch(() => {});
+  } catch (err) {
+    console.error("[bg] DO_APPLY error:", err?.message || err);
+    await postToBackend("/api/apply/result", {
+      id: task.id, job_id: task.job_id, status: "failed", error_msg: err?.message || "apply_error",
+    }).catch(() => {});
+  }
+
+  return "done";
+}
+
+// Process the apply queue with a delay between each (avoids hammering Instahyre).
+async function runApplyLoop() {
+  while (true) {
+    const result = await processOneApply();
+    if (result !== "done") break;
+    await keepAliveDelay(4000);
   }
 }
 

@@ -137,6 +137,8 @@ export default function FreshJobsPortal() {
   const [companyQuery,       setCompanyQuery]       = useState("");
   const [companySource,      setCompanySource]      = useState("all");
   const [companyScrapeBusy,  setCompanyScrapeBusy]  = useState(false);
+  const [applyBusy,          setApplyBusy]          = useState(false);
+  const [applyCounts,        setApplyCounts]        = useState(null);
 
   const { jobs, loading, error, refetch, updateStatus, dismissJob } = useJobs();
 
@@ -233,6 +235,61 @@ export default function FreshJobsPortal() {
       toast.error(err.response?.data?.error || "Failed to queue company search.");
     } finally {
       setCompanyScrapeBusy(false);
+    }
+  }
+
+  // Poll Instahyre apply progress; refetch jobs when a run finishes.
+  const applyPrevActiveRef = useRef(false);
+  useEffect(() => {
+    let mounted = true;
+    const poll = async () => {
+      try {
+        const res = await client.get("/api/apply/status");
+        if (!mounted) return;
+        const counts = res.data?.counts || {};
+        setApplyCounts(counts);
+        const active = (counts.pending || 0) + (counts.processing || 0) > 0;
+        if (applyPrevActiveRef.current && !active) refetch();
+        applyPrevActiveRef.current = active;
+      } catch {
+        // ignore
+      }
+    };
+    poll();
+    const id = setInterval(poll, 4000);
+    return () => { mounted = false; clearInterval(id); };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const instahyreToApply = jobs.filter(
+    (j) => String(j.source || "").toLowerCase() === "instahyre" && j.status !== "applied"
+  ).length;
+  const applyActive = !!applyCounts && ((applyCounts.pending || 0) + (applyCounts.processing || 0) > 0);
+  const applyLeft = applyCounts ? (applyCounts.pending || 0) + (applyCounts.processing || 0) : 0;
+
+  async function handleEasyApplyInstahyre() {
+    if (!extDetected) {
+      toast.error("Extension not connected.\nInstall from Settings → Chrome Extension section.", {
+        duration: 6000, style: { whiteSpace: "pre-line" },
+      });
+      setShowStatusPanel(true);
+      return;
+    }
+    if (instahyreToApply === 0) {
+      toast.error("No Instahyre jobs to apply to. Scrape Instahyre first.");
+      return;
+    }
+    if (!window.confirm(`Apply to ${instahyreToApply} Instahyre job(s)?\nThis submits real applications on your behalf.`)) {
+      return;
+    }
+    setApplyBusy(true);
+    try {
+      const res = await client.post("/api/apply/instahyre");
+      toast.success(`Queued ${res.data?.queued ?? 0} job(s) — applying in the background…`, { duration: 4000 });
+      window.dispatchEvent(new CustomEvent("jh:trigger-apply"));
+    } catch (err) {
+      toast.error(err.response?.data?.error || "Failed to queue applications.");
+    } finally {
+      setApplyBusy(false);
     }
   }
 
@@ -416,6 +473,20 @@ export default function FreshJobsPortal() {
           {isActivelyScraping ? "●" : "≡"} Status
         </button>
       </div>
+
+      {/* ── Instahyre one-click bulk apply ─────────────── */}
+      <button
+        onClick={handleEasyApplyInstahyre}
+        disabled={applyBusy || applyActive || instahyreToApply === 0}
+        title="Auto-apply to all your scraped Instahyre jobs in one click"
+        className="w-full rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-emerald-500 disabled:opacity-60"
+      >
+        {applyActive
+          ? `Applying on Instahyre… ${applyLeft} left`
+          : applyBusy
+          ? "Queuing…"
+          : `⚡ Easy Apply Instahyre${instahyreToApply ? ` (${instahyreToApply})` : ""}`}
+      </button>
 
       {/* NEW: Targeted Company Search */}
       <div className="grid grid-cols-1 gap-2 md:grid-cols-[1fr_auto_auto]">
