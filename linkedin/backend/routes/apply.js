@@ -121,7 +121,7 @@ router.get("/status", async (req, res) => {
   }
 });
 
-// POST /api/apply/stop — cancel the run.
+// POST /api/apply/stop — cancel the run and clear anything still queued.
 router.post("/stop", async (req, res) => {
   try {
     await execute(
@@ -129,8 +129,11 @@ router.post("/stop", async (req, res) => {
        ON CONFLICT (key, user_id) DO UPDATE SET value='false'`,
       [req.userId]
     );
-    await execute("UPDATE apply_queue SET status='pending' WHERE status='processing' AND user_id=$1", [req.userId]);
-    res.json({ ok: true });
+    const cancelled = await execute(
+      "UPDATE apply_queue SET status='cancelled', processed_at=NOW() WHERE status IN ('pending','processing') AND user_id=$1",
+      [req.userId]
+    );
+    res.json({ ok: true, cancelled });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

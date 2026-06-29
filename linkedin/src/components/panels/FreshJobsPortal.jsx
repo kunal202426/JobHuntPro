@@ -293,6 +293,16 @@ export default function FreshJobsPortal() {
     }
   }
 
+  async function cancelApply() {
+    try {
+      await client.post("/api/apply/stop");
+      setApplyCounts((c) => ({ ...(c || {}), pending: 0, processing: 0 }));
+      toast.success("Apply run cancelled.");
+    } catch {
+      toast.error("Failed to cancel.");
+    }
+  }
+
   async function cleanupOldJobs() {
     setCleanupBusy(true);
     try {
@@ -475,18 +485,29 @@ export default function FreshJobsPortal() {
       </div>
 
       {/* ── Instahyre one-click bulk apply ─────────────── */}
-      <button
-        onClick={handleEasyApplyInstahyre}
-        disabled={applyBusy || applyActive || instahyreToApply === 0}
-        title="Auto-apply to all your scraped Instahyre jobs in one click"
-        className="w-full rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-emerald-500 disabled:opacity-60"
-      >
-        {applyActive
-          ? `Applying on Instahyre… ${applyLeft} left`
-          : applyBusy
-          ? "Queuing…"
-          : `⚡ Easy Apply Instahyre${instahyreToApply ? ` (${instahyreToApply})` : ""}`}
-      </button>
+      <div className="flex items-center gap-2">
+        <button
+          onClick={handleEasyApplyInstahyre}
+          disabled={applyBusy || applyActive || instahyreToApply === 0}
+          title="Auto-apply to all your scraped Instahyre jobs in one click"
+          className="flex-1 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-emerald-500 disabled:opacity-60"
+        >
+          {applyActive
+            ? `Applying on Instahyre… ${applyLeft} left`
+            : applyBusy
+            ? "Queuing…"
+            : `⚡ Easy Apply Instahyre${instahyreToApply ? ` (${instahyreToApply})` : ""}`}
+        </button>
+        {applyActive && (
+          <button
+            onClick={cancelApply}
+            title="Cancel applying"
+            className="rounded-lg border border-rose-300 bg-rose-50 px-2.5 py-1.5 text-xs font-medium text-rose-700 transition hover:bg-rose-100"
+          >
+            ✕ Cancel
+          </button>
+        )}
+      </div>
 
       {/* NEW: Targeted Company Search */}
       <div className="grid grid-cols-1 gap-2 md:grid-cols-[1fr_auto_auto]">
