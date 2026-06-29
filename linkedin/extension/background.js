@@ -543,6 +543,26 @@ async function syncRunState() {
     }
   } catch {}
   await syncDailyLimitFromBackend();
+  await syncConnectionsTodayFromBackend();
+}
+
+// The backend's daily_stats is the source of truth for today's sent count. Mirror
+// it locally so the limit check can't drift (and so resetting it server-side
+// actually clears the local cap).
+async function syncConnectionsTodayFromBackend() {
+  try {
+    const res = await fetchFromBackend("/api/stats/today");
+    if (!res?.ok) return;
+    const data = await res.json().catch(() => null);
+    if (!data) return;
+    const sent = parseInt(data.connections_sent || 0, 10);
+    if (Number.isFinite(sent)) {
+      await chrome.storage.local.set({
+        connections_today: sent,
+        last_reset_date: new Date().toDateString(),
+      });
+    }
+  } catch {}
 }
 
 async function ensureDailyReset() {
