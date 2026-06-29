@@ -114,8 +114,15 @@ function isFresh(parsedTs) {
 
 function extractJobCard(card) {
   try {
+    const cardText = card.textContent || "";
+
     // Skip listings that are closed / no longer accepting applicants.
-    if (/no longer accepting applications|applications are closed|this job is no longer/i.test(card.textContent || "")) {
+    if (/no longer accepting applications|applications are closed|this job is no longer/i.test(cardText)) {
+      return null;
+    }
+
+    // Skip "Reposted …" listings — recycled/stale jobs, regardless of repost time.
+    if (/reposted/i.test(cardText)) {
       return null;
     }
 
