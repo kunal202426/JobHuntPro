@@ -319,6 +319,23 @@ function hasPendingInviteIndicatorGlobal() {
   return false;
 }
 
+// STRICT "we already invited this person" check. The only reliable signal is a
+// visible "Withdraw invitation" control near the top of the profile — that
+// exists ONLY for someone you personally invited. We do NOT use loose "Pending"
+// text, which can come from carousels / nav and caused false "Sent".
+function isAlreadyInvited() {
+  const els = Array.from(document.querySelectorAll('button, a, [role="button"], [aria-label]'));
+  for (const el of els) {
+    if (!isElementVisible(el)) continue;
+    const label = normalizeText((el.getAttribute && el.getAttribute("aria-label")) || "").toLowerCase();
+    const text = normalizeText(el.textContent || "").toLowerCase();
+    if (!/withdraw invitation/.test(label) && !/withdraw invitation/.test(text)) continue;
+    try { const r = el.getBoundingClientRect(); if (r && r.top > 700) continue; } catch (e) { /* ignore */ }
+    return true;
+  }
+  return false;
+}
+
 function isPending() {
   // Classic button-style pending state
   if (document.querySelector('button[aria-label*="Pending"], button[aria-label*="pending"]')) {
@@ -454,7 +471,7 @@ async function tryMoreActionsConnect() {
     // Already invited? The profile menu shows "Withdraw invitation"/"Pending"
     // instead of a Connect (custom-invite) item.
     const menuTxt = normalizeText(menu.textContent || "").toLowerCase();
-    if (/withdraw invitation|pending/.test(menuTxt) && !menu.querySelector('a[href*="custom-invite" i]')) {
+    if (/withdraw invitation/.test(menuTxt) && !menu.querySelector('a[href*="custom-invite" i]')) {
       closeAnyMenu();
       return { element: null, followOnly: false, pending: true };
     }
@@ -487,7 +504,7 @@ async function tryMoreActionsConnect() {
 // the global "Invitation sent" toast — the extension reuses one tab and a toast
 // from a previous person lingers, which caused false positives.
 function inviteSucceeded() {
-  return isPending();
+  return isAlreadyInvited();
 }
 
 // LinkedIn refused the invite (weekly limit, "moving too fast", upsell, etc.).
@@ -599,7 +616,7 @@ async function attemptConnect(profile_url) {
   }
 
   if (isAlreadyConnected()) return { status: "already_connected" };
-  if (isPending())           return { status: "sent" };
+  if (isAlreadyInvited())    return { status: "already_pending" };
 
   // Case A: a directly-visible Connect button (rare on the new UI).
   const directBtn = findDirectConnectButton();
@@ -612,18 +629,18 @@ async function attemptConnect(profile_url) {
     if (res.pending) return { status: "already_pending" };
     if (res.followOnly) return { status: "no_button", error: "follow_only" };
     if (!res.element) {
-      if (isPending()) return { status: "already_pending" };
+      if (isAlreadyInvited()) return { status: "already_pending" };
       if (isFollowOnly()) return { status: "no_button", error: "follow_only" };
       return { status: "no_button", error: "connect_button_not_found" };
     }
   }
 
   // Single place that finds the invite modal, clicks "Send without a note", and
-  // verifies the invite actually went out (modal closes / toast / pending).
+  // verifies the invite actually went out (modal closes / withdraw-invitation).
   const modalResult = await handleConnectModal();
   if (modalResult === "sent") return { status: "sent" };
   if (modalResult === "email_required") return { status: "no_button", error: "email_required" };
-  if (isPending()) return { status: "sent" };
+  if (isAlreadyInvited()) return { status: "sent" };
   return { status: "failed", error: modalResult };
 }
 
