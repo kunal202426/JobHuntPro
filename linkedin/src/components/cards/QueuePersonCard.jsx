@@ -13,7 +13,6 @@ const STATUS_INFO = {
   skipped: { pill: "bg-stone-100 text-stone-500", label: "Skipped" },
 };
 
-const RETRYABLE = new Set(["failed", "no_button", "skipped"]);
 const TERMINAL = new Set(["sent", "accepted", "already_connected", "already_pending"]);
 
 function getInitials(name) {
@@ -26,7 +25,9 @@ function getInitials(name) {
 export default function QueuePersonCard({ person, onSkip, onRetry }) {
   const info = STATUS_INFO[person.status] ?? STATUS_INFO.pending;
   const canSkip = person.status === "pending";
-  const canRetry = RETRYABLE.has(person.status);
+  // Allow retry on any settled status — including "Sent" — so a false positive
+  // can be re-verified. Only in-flight states (pending/processing) can't retry.
+  const canRetry = !["pending", "processing"].includes(person.status);
 
   return (
     <article className="space-y-2 rounded-xl border border-stone-200 bg-white p-3 shadow-sm">
