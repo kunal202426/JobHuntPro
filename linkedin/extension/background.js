@@ -8,7 +8,9 @@ const MAX_DAILY_LIMIT = 100;
 const SESSION_ACTIVE_KEY = "jh_session_active";
 const SCRAPE_SOURCES = {
   linkedin: {
-    url: "https://www.linkedin.com/jobs/search/?f_TPR=r86400&sortBy=DD",
+    // f_TPR=r86400 → past 24h · f_E=1,2,3 → Internship/Entry/Associate only
+    // (no Mid-Senior/Director/Exec) · geoId=102713980 → India · sortBy=DD → newest
+    url: "https://www.linkedin.com/jobs/search/?keywords=Software&f_TPR=r86400&f_E=1%2C2%2C3&geoId=102713980&sortBy=DD",
     hostPrefix: "https://www.linkedin.com/",
     injectFile: "content/linkedin_jobs.js",
   },
@@ -48,7 +50,8 @@ function toKebabCase(value) {
 function buildCompanySearchUrl(source, company) {
   const encoded = encodeURIComponent(company);
   if (source === "linkedin") {
-    return `https://www.linkedin.com/jobs/search/?keywords=${encoded}&f_TPR=r86400&sortBy=DD`;
+    // Same junior-only (f_E) + past-24h filters for targeted company search.
+    return `https://www.linkedin.com/jobs/search/?keywords=${encoded}&f_TPR=r86400&f_E=1%2C2%2C3&sortBy=DD`;
   }
   if (source === "naukri") {
     const slug = toKebabCase(company) || "jobs";
