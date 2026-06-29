@@ -491,52 +491,47 @@ function getSendInviteModal() {
   return null;
 }
 
+function hasEmailGate() {
+  return !!document.querySelector('[role="dialog"] input[type="email"], .artdeco-modal input[type="email"], [role="dialog"] input[name="email"], .artdeco-modal input[name="email"]');
+}
+
 async function handleConnectModal() {
   const TIMEOUT_MS = 15000;
   const start = Date.now();
 
-  // 1) Wait for the invite modal to appear (or an immediate pending/toast).
-  let modal = null;
-  while (Date.now() - start < 6000) {
+  // 1) Wait for the invite modal — detected by its "Send without a note" button
+  //    (deep search across shadow DOM / layers). This is more reliable than
+  //    matching a modal container class, which LinkedIn changes.
+  let sendBtn = null;
+  while (Date.now() - start < 8000) {
     if (inviteSucceeded()) return "sent";
-    modal = getSendInviteModal();
-    if (modal) break;
+    if (hasEmailGate()) {
+      const closeBtn = document.querySelector('button[aria-label="Dismiss"], [aria-label="Dismiss"], button[aria-label*="close" i]');
+      if (closeBtn) robustClick(closeBtn);
+      return "email_required";
+    }
+    sendBtn = findSendWithoutNoteButtonDeep();
+    if (sendBtn) break;
     await sleep(300);
   }
-  if (!modal) {
+  if (!sendBtn) {
     if (inviteSucceeded()) return "sent";
-    try { console.warn("[LinkedIn Connect] no invite modal appeared — debug:", collectActionButtonDebug()); } catch (e) {}
+    try { console.warn("[LinkedIn Connect] no 'Send without a note' button appeared — debug:", collectActionButtonDebug()); } catch (e) {}
     return "modal_timeout";
   }
 
-  // 2) Email-gated "How do you know X?" — too risky, abort cleanly.
-  if (modal.querySelector('input[name="email"], input[type="email"]')) {
-    const closeBtn = modal.querySelector(
-      'button[aria-label="Dismiss"], [aria-label="Dismiss"], button[aria-label*="close" i]'
-    );
-    if (closeBtn) robustClick(closeBtn);
-    return "email_required";
-  }
-
-  // 3) Click "Send without a note".
-  const sendBtn = findSendWithoutNoteButton(modal) || findSendWithoutNoteButtonDeep();
-  if (!sendBtn) {
-    try { console.warn("[LinkedIn Connect] modal open but no Send button — debug:", collectActionButtonDebug()); } catch (e) {}
-    return "send_button_missing";
-  }
+  // 2) Click it.
   robustClick(sendBtn);
 
-  // 4) Verify. The reliable, person-specific signal is the invite modal CLOSING
-  // after we click that person's Send button — LinkedIn only closes it on a real
-  // send. But first rule out a "blocked"/limit dialog or an email gate replacing it.
+  // 3) Confirm: the "Send without a note" button goes away (LinkedIn closes the
+  //    modal only on a real send), and no blocked/limit dialog took its place.
   while (Date.now() - start < TIMEOUT_MS) {
     await sleep(400);
     if (hasInviteBlockedDialog()) return "invite_blocked";
-    const stillOpen = getSendInviteModal();
-    if (!stillOpen) {
-      const emailGate = document.querySelector('[role="dialog"] input[type="email"], .artdeco-modal input[name="email"]');
-      if (emailGate) return "email_required";
+    if (inviteSucceeded()) return "sent";
+    if (!findSendWithoutNoteButtonDeep()) {
       if (hasInviteBlockedDialog()) return "invite_blocked";
+      if (hasEmailGate()) return "email_required";
       return "sent";
     }
   }
