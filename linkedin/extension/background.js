@@ -334,12 +334,12 @@ async function processOneApply() {
   return "done";
 }
 
-// Process the apply queue with a delay between each (avoids hammering Instahyre).
+// Process the apply queue with a short 1s gap between each.
 async function runApplyLoop() {
   while (true) {
     const result = await processOneApply();
     if (result !== "done") break;
-    await keepAliveDelay(4000);
+    await keepAliveDelay(1000);
   }
 }
 
