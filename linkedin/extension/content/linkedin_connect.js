@@ -202,7 +202,27 @@ function isFirstDegreeConnection() {
   return /\b1st\b/.test(text);
 }
 
+// The name of the profile we're currently viewing (main heading).
+function getCurrentProfileName() {
+  const h1 = document.querySelector("main h1") || document.querySelector("h1");
+  return normalizeText(h1 ? h1.textContent : "").toLowerCase();
+}
+
+// Make sure an "Invite <name> to connect" button is for the CURRENT profile,
+// not someone in the "People similar / More profiles" carousels.
+function labelMatchesProfile(label, profileName) {
+  const m = (label || "").toLowerCase().match(/invite (.+?) to connect/);
+  if (!m) return true;            // not a named-invite button — don't name-filter
+  if (!profileName) return true;  // unknown current profile — can't filter
+  const who = m[1].trim();
+  if (who.includes(profileName) || profileName.includes(who)) return true;
+  const pFirst = profileName.split(/\s+/)[0];
+  const wFirst = who.split(/\s+/)[0];
+  return !!pFirst && pFirst === wFirst;
+}
+
 function findDirectConnectButton() {
+  const profileName = getCurrentProfileName();
   const selectors = [
     // New LinkedIn UI: the Connect control is often a <div>/custom element with
     // aria-label "Invite <name> to connect" and a componentkey attribute.
@@ -226,6 +246,8 @@ function findDirectConnectButton() {
       const label = (btn.getAttribute("aria-label") || "").toLowerCase();
       if (/message|follow|pending|withdraw|remove connection/i.test(label)) continue;
       if (!isElementVisible(btn)) continue;
+      // Don't grab a "People similar" card's Connect for a different person.
+      if (!labelMatchesProfile(label, profileName)) continue;
       return btn;
     }
   }
@@ -236,18 +258,22 @@ function findDirectConnectButton() {
 }
 
 function findConnectByText() {
-  const top = getProfileTopCard() || document.body;
+  // Only search a real top card. If we can't find one (new UI), return null so
+  // the flow uses the "More" dropdown — searching document.body here risks
+  // grabbing a "People similar" carousel Connect for a different person.
+  const top = getProfileTopCard();
+  if (!top) return null;
+  const profileName = getCurrentProfileName();
   const cand = Array.from(top.querySelectorAll("div,span,p,a,button"));
   for (const el of cand) {
     const txt = normalizeText(el.textContent || "").toLowerCase();
     if (txt === "connect" || /\bconnect\b/.test(txt)) {
-      // prefer a clickable/button element
-      if (el.closest && el.closest('button, a, [role="button"], div[aria-label*="connect" i], div[aria-label*="invite" i]')) {
-        return el.closest('button, a, [role="button"], div[aria-label*="connect" i], div[aria-label*="invite" i]');
-      }
-      if (el.tagName === 'BUTTON' && !el.disabled) return el;
-      // if element itself is clickable
-      if (el.getAttribute && (el.getAttribute('role') === 'button' || el.onclick)) return el;
+      const clickable = (el.closest && el.closest('button, a, [role="button"], div[aria-label*="connect" i], div[aria-label*="invite" i]'))
+        || (el.tagName === "BUTTON" && !el.disabled ? el : null);
+      if (!clickable) continue;
+      const label = (clickable.getAttribute && clickable.getAttribute("aria-label")) || "";
+      if (!labelMatchesProfile(label, profileName)) continue;
+      return clickable;
     }
   }
   return null;
