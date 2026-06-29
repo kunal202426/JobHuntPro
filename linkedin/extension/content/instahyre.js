@@ -13,6 +13,35 @@
     "machine learning", "ai", "data engineer", "fintech",
   ];
 
+  // Senior / too-experienced titles to skip (Sr., Senior, Lead, III, SDE 2/3, …)
+  const EXCLUDE_TITLE_PATTERNS = [
+    /\bsenior\b/i, /\bsr\.?\b/i, /\blead\b/i, /\bprincipal\b/i, /\bstaff\b/i,
+    /\barchitect\b/i, /\bmanager\b/i, /\bdirector\b/i, /\bhead\b/i, /\bvp\b/i,
+    /vice president/i, /\bchief\b/i, /\bcto\b/i, /\bfounder\b/i,
+    /\biii\b/i, /\biv\b/i,
+    /\b(sde|swe|sse|mts)[-\s]?(2|3|4|5|ii|iii|iv|v)\b/i,
+    /\b(software\s+|backend\s+|frontend\s+|full[-\s]?stack\s+)?(engineer|developer|programmer)[-\s]+(2|3|4|5|ii|iii|iv|v)\b/i,
+    /\blevel[-\s]?(2|3|4|5)\b/i,
+  ];
+
+  function isSeniorTitle(title) {
+    return EXCLUDE_TITLE_PATTERNS.some((re) => re.test(title || ""));
+  }
+
+  // Discard if the role wants MORE than 2 years of experience.
+  // "1-4 Years" → max 4 > 2 → discard. "0-2 Years" → keep. "2+ years" → discard.
+  function tooMuchExperience(expText) {
+    if (!expText) return false;
+    const lower = expText.toLowerCase();
+    const nums = (lower.match(/\d+/g) || []).map(Number);
+    if (nums.length === 0) return false;
+    const maxYear = Math.max(...nums);
+    const hasPlus = /\d+\s*\+/.test(lower);
+    if (maxYear > 2) return true;
+    if (hasPlus && maxYear >= 2) return true; // "2+ years" etc.
+    return false;
+  }
+
   const seenUrls = new Set();
   const pendingJobs = [];
   let debounceTimer = null;
@@ -43,6 +72,7 @@
 
   function isRelevant(title) {
     const lower = (title || "").toLowerCase();
+    if (isSeniorTitle(lower)) return false;
     return TECH_KEYWORDS.some((kw) => lower.includes(kw));
   }
 
@@ -143,6 +173,8 @@
         card.querySelector("[class*='exp']") ||
         card.querySelector("[class*='yrs']");
       const experience_required = cleanText(expEl?.textContent) || null;
+      // Skip roles requiring more than 2 years of experience.
+      if (tooMuchExperience(experience_required)) return null;
 
       const salaryEl =
         card.querySelector("[class*='salary']") ||

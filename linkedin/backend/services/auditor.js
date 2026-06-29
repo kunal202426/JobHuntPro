@@ -38,12 +38,27 @@ export function scoreJob(job) {
   if (REJECT_TITLES.some(k => title.includes(k)))
     return { score: 0, reason: "non-tech role", keep: false };
 
-  // Hard reject — numbered senior levels (SDE 2/3, Engineer II/III, Level 3, …).
+  // Hard reject — senior / numbered levels (Sr., III, SDE 2/3, Engineer II, Level 3).
   // SDE 1 / SDE I / unnumbered titles are kept.
-  if (/\b(sde|swe|sse|mts)[-\s]?(2|3|4|5|ii|iii|iv|v)\b/.test(title)
+  if (/\bsr\.?\b/.test(title) || /\b(iii|iv)\b/.test(title)
+      || /\b(sde|swe|sse|mts)[-\s]?(2|3|4|5|ii|iii|iv|v)\b/.test(title)
       || /\b(engineer|developer|programmer)[-\s]+(2|3|4|5|ii|iii|iv|v)\b/.test(title)
       || /\blevel[-\s]?(2|3|4|5)\b/.test(title)) {
-    return { score: 1, reason: "too senior (numbered level)", keep: false };
+    return { score: 1, reason: "too senior", keep: false };
+  }
+
+  // Hard reject — role wants MORE than 2 years of experience (e.g. Instahyre's
+  // "1-4 Years" field, which the generic regex below may not catch).
+  const expField = (job.experience_required || "").toLowerCase();
+  if (expField) {
+    const nums = (expField.match(/\d+/g) || []).map(Number);
+    if (nums.length) {
+      const maxY = Math.max(...nums);
+      const plus = /\d+\s*\+/.test(expField);
+      if (maxY > 2 || (plus && maxY >= 2)) {
+        return { score: 1, reason: `needs >2 yrs (${job.experience_required})`, keep: false };
+      }
+    }
   }
 
   let score = 5;
