@@ -1,9 +1,6 @@
-/* ── Panel layout: 3-col desktop → single-panel mobile ─────── */
+/* ── Panel layout: engine-based desktop, single-panel mobile ─── */
 
 .lb-panels {
-  display: grid;
-  grid-template-columns: 1.35fr 1.05fr 1fr;
-  flex: 1;
   overflow: hidden;
   min-height: 0;
 }
@@ -15,26 +12,95 @@
   min-height: 0;
 }
 
+/* ── Jobs Hunt Engine: FreshJobsPortal full width ──────────── */
+.lb-panels.lb-jobs-engine {
+  display: flex;
+}
+
+.lb-panels.lb-jobs-engine .lb-panel:nth-child(1) {
+  flex: 1;
+}
+
+/* No right border when the panel fills the whole width */
+.lb-panels.lb-jobs-engine .lb-panel:nth-child(1) section {
+  border-right: none;
+}
+
+.lb-panels.lb-jobs-engine .lb-panel:nth-child(n + 2) {
+  display: none;
+}
+
+/* ── Leads Engine: CompanyLeadsList | LeadConnector, 2-col ─── */
+.lb-panels.lb-leads-engine {
+  display: grid;
+  grid-template-columns: 1.1fr 1fr;
+}
+
+.lb-panels.lb-leads-engine .lb-panel:nth-child(1) {
+  display: none;
+}
+
+/* ── Engine switcher bar — desktop only ──────────────────────── */
+.lb-engine-switcher {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 4px;
+  padding: 7px 16px;
+  background: white;
+  border-bottom: 1px solid #e8e2dc;
+}
+
+.lb-engine-btn {
+  padding: 5px 14px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #6b6059;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  letter-spacing: 0.01em;
+  transition: color 0.15s, background 0.15s;
+}
+
+.lb-engine-btn:hover:not(.lb-engine-active) {
+  color: #1c1510;
+  background: #f3efe9;
+}
+
+.lb-engine-btn.lb-engine-active {
+  background: #1c1510;
+  color: #fdfaf8;
+  border-color: #1c1510;
+}
+
+/* ── Mobile: single panel view controlled by lb-active ──────── */
 @media (max-width: 767px) {
+  .lb-engine-switcher {
+    display: none;
+  }
+
+  /* Override any desktop engine layout — mobile always uses absolute stacking */
   .lb-panels {
-    display: block;
+    display: block !important;
     position: relative;
     overflow: hidden;
   }
 
   .lb-panel {
-    position: absolute;
-    inset: 0;
-    display: none;
+    position: absolute !important;
+    inset: 0 !important;
+    display: none !important;
     flex-direction: column;
     overflow: hidden;
   }
 
   .lb-panel.lb-active {
-    display: flex;
+    display: flex !important;
   }
 
-  /* Remove right border on last visible panel */
+  /* Remove right border on the visible panel */
   .lb-panel.lb-active section {
     border-right: none !important;
   }

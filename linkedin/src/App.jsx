@@ -13,7 +13,8 @@ const MOBILE_TABS = [
 ];
 
 export default function App() {
-  const [mobilePanel, setMobilePanel] = useState("jobs");
+  const [engine,      setEngine]      = useState("jobs"); // desktop: "jobs" | "leads"
+  const [mobilePanel, setMobilePanel] = useState("jobs"); // mobile tab
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-stone-100 text-slate-900">
@@ -28,7 +29,24 @@ export default function App() {
         </span>
       </div>
 
-      <div className="lb-panels flex-1">
+      {/* Engine switcher — desktop only (hidden on mobile via CSS) */}
+      <div className="lb-engine-switcher">
+        <button
+          className={`lb-engine-btn ${engine === "jobs" ? "lb-engine-active" : ""}`}
+          onClick={() => setEngine("jobs")}
+        >
+          💼 Jobs Hunt Engine
+        </button>
+        <button
+          className={`lb-engine-btn ${engine === "leads" ? "lb-engine-active" : ""}`}
+          onClick={() => setEngine("leads")}
+        >
+          👥 Leads Engine
+        </button>
+      </div>
+
+      {/* Panel area — engine class controls desktop layout; lb-active controls mobile */}
+      <div className={`lb-panels flex-1 ${engine === "jobs" ? "lb-jobs-engine" : "lb-leads-engine"}`}>
         <div className={`lb-panel ${mobilePanel === "jobs" ? "lb-active" : ""}`}>
           <FreshJobsPortal />
         </div>
