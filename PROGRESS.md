@@ -159,3 +159,11 @@
 4. OpenRouter key availability (0.4)
 
 _These don't block code edits in Phases 1–4, but DO block final `.env` values and deploy (Phase 5)._
+
+---
+
+## Post-deploy scraper modules
+
+| Source | Status | Notes |
+|--------|--------|-------|
+| Hiring Cafe | ✅ | New `content/hiringcafe.js`. Reads the Next.js `__NEXT_DATA__` SSR blob (`ssrHits`) instead of DOM cards; same-origin `fetch()` paginates up to 5 pages. Filters on structured fields — `min_industry_and_role_yoe ≤ 2`, drops `Senior Level`, keeps Software Development / Data & Analytics (or strong sw keyword), freshness via exact `estimated_publish_date_millis`. Links out to the original posting (apply_url) → scrape-only, no auto-apply. URL `searchState={dateFetchedPastNDays:1,sortBy:date}`, India via IP geo. Wired into SCRAPE_SOURCES, buildCompanySearchUrl, manifest host_permissions, backend SOURCES/COMPANY_SOURCES, and both frontend dropdowns. |

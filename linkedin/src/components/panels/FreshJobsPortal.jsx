@@ -6,7 +6,7 @@ import PanelShell from "../layout/PanelShell";
 import JobCard from "../cards/JobCard";
 import EmptyState from "../shared/EmptyState";
 
-const SOURCES = ["all", "naukri", "linkedin", "cutshort", "instahyre"];
+const SOURCES = ["all", "naukri", "linkedin", "cutshort", "instahyre", "hiringcafe"];
 
 const DATE_FILTERS = [
   { value: "all",       label: "All Time"  },
@@ -460,6 +460,7 @@ export default function FreshJobsPortal() {
           <option value="naukri">Naukri</option>
           <option value="cutshort">Cutshort</option>
           <option value="instahyre">Instahyre</option>
+          <option value="hiringcafe">Hiring Cafe</option>
           <option value="all">All portals</option>
         </select>
         <button
@@ -527,6 +528,7 @@ export default function FreshJobsPortal() {
           <option value="linkedin">LinkedIn</option>
           <option value="naukri">Naukri</option>
           <option value="instahyre">Instahyre</option>
+          <option value="hiringcafe">Hiring Cafe</option>
         </select>
         <button
           onClick={triggerCompanyScrape}

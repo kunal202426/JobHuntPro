@@ -30,6 +30,14 @@ const SCRAPE_SOURCES = {
     hostPrefix: "https://www.instahyre.com/",
     injectFile: "content/instahyre.js",
   },
+  hiringcafe: {
+    // searchState={"dateFetchedPastNDays":1,"sortBy":"date"} → freshest first.
+    // Location defaults to the user's country (India) via IP geo, same as the
+    // site's own pagination links. SSR embeds jobs in __NEXT_DATA__.
+    url: "https://hiring.cafe/?searchState=%7B%22dateFetchedPastNDays%22%3A1%2C%22sortBy%22%3A%22date%22%7D",
+    hostPrefix: "https://hiring.cafe/",
+    injectFile: "content/hiringcafe.js",
+  },
 };
 
 // NEW: Targeted Company Search
@@ -59,6 +67,10 @@ function buildCompanySearchUrl(source, company) {
   }
   if (source === "instahyre") {
     return `https://www.instahyre.com/jobs/?search=${encoded}`;
+  }
+  if (source === "hiringcafe") {
+    const state = JSON.stringify({ searchQuery: company, sortBy: "date" });
+    return `https://hiring.cafe/?searchState=${encodeURIComponent(state)}`;
   }
   return null;
 }

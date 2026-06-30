@@ -4,9 +4,9 @@ import { getRow, getRows, execute } from "../db/client.js";
 
 const router = Router();
 
-const SOURCES = ["linkedin", "naukri", "cutshort", "instahyre"];
+const SOURCES = ["linkedin", "naukri", "cutshort", "instahyre", "hiringcafe"];
 // NEW: Targeted Company Search
-const COMPANY_SOURCES = ["linkedin", "naukri", "instahyre"];
+const COMPANY_SOURCES = ["linkedin", "naukri", "instahyre", "hiringcafe"];
 
 function normalizeSource(source) {
   const s = String(source || "").trim().toLowerCase();
