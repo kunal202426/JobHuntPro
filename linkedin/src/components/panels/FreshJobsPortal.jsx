@@ -534,6 +534,7 @@ export default function FreshJobsPortal() {
                       const color =
                         state.status === "completed"      ? "text-emerald-700"
                         : state.status === "login_required" ? "text-rose-700"
+                        : state.status === "failed"          ? "text-rose-600"
                         : state.status === "processing"     ? "text-sky-700"
                         : "text-slate-500";
                       return (
@@ -542,6 +543,9 @@ export default function FreshJobsPortal() {
                           <div className={`text-[10px] ${color}`}>{state.status}</div>
                           {state.status === "login_required" && (
                             <div className="text-[9px] text-rose-600">Login then Scrape again.</div>
+                          )}
+                          {state.status === "failed" && state.message && (
+                            <div className="text-[9px] text-rose-500 break-words">{state.message}</div>
                           )}
                         </div>
                       );
