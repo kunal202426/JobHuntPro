@@ -101,15 +101,15 @@ export default function JobCard({ job, onStatusChange, onDismiss, showAppliedDat
       <div className="flex items-start gap-2 px-3.5 pt-3">
         <div className="flex-1 min-w-0">
           <div className="flex flex-wrap items-center gap-1.5">
-            <p className="text-[13px] font-semibold leading-snug text-slate-900">{job.title}</p>
+            <p className="text-sm font-semibold leading-snug text-slate-900">{job.title}</p>
             {isNew && (
-              <span className="shrink-0 rounded-full bg-emerald-100 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-emerald-700">
+              <span className="shrink-0 rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-700">
                 New
               </span>
             )}
           </div>
-          {line1 && <p className="mt-0.5 text-[11px] font-medium text-slate-600">{line1}</p>}
-          {line2 && <p className="text-[11px] text-slate-400">{line2}</p>}
+          {line1 && <p className="mt-0.5 text-xs font-medium text-slate-600">{line1}</p>}
+          {line2 && <p className="text-xs text-slate-400">{line2}</p>}
         </div>
         <div className="flex shrink-0 items-center gap-1">
           <ScoreBadge score={job.ai_score} />
@@ -125,53 +125,53 @@ export default function JobCard({ job, onStatusChange, onDismiss, showAppliedDat
 
       {/* AI reason */}
       {job.ai_reason && (
-        <p className="mt-1 px-3.5 text-[10px] italic text-slate-400">{job.ai_reason}</p>
+        <p className="mt-1 px-3.5 text-xs italic text-slate-400">{job.ai_reason}</p>
       )}
 
       {/* Skills */}
       {job.skills?.length > 0 && (
         <div className="mt-2 flex flex-wrap gap-1 px-3.5">
           {job.skills.slice(0, 5).map((skill, idx) => (
-            <span key={idx} className="rounded-md bg-stone-100 px-1.5 py-0.5 text-[10px] text-slate-600">
+            <span key={idx} className="rounded-md bg-stone-100 px-1.5 py-0.5 text-[11px] text-slate-600">
               {skill}
             </span>
           ))}
           {job.skills.length > 5 && (
-            <span className="self-center text-[10px] text-slate-400">+{job.skills.length - 5}</span>
+            <span className="self-center text-[11px] text-slate-400">+{job.skills.length - 5}</span>
           )}
         </div>
       )}
 
       {/* Actions */}
-      <div className="mt-auto border-t border-stone-100 px-3.5 py-2.5 flex items-center gap-1.5 flex-wrap">
+      <div className="mt-auto border-t border-stone-100 px-3.5 py-3 flex items-center gap-2 flex-wrap">
         <select
           value={job.status === "seen" ? "unseen" : job.status}
           onChange={(e) => onStatusChange(job.id, e.target.value)}
-          className="rounded-md border border-stone-300 bg-white px-1.5 py-1 text-[11px] text-slate-600 focus:border-sky-400 focus:outline-none"
+          className="rounded-md border border-stone-300 bg-white px-2 py-1.5 text-xs text-slate-600 focus:border-sky-400 focus:outline-none"
         >
           {STATUSES.map((s) => (
             <option key={s.value} value={s.value}>{s.label}</option>
           ))}
         </select>
 
-        <div className="ml-auto flex items-center gap-1.5">
+        <div className="ml-auto flex items-center gap-2">
           <a
             href={job.job_url}
             target="_blank"
             rel="noreferrer"
             onClick={() => isNew && onStatusChange(job.id, "seen")}
-            className="flex items-center gap-1 rounded-md bg-slate-900 px-2.5 py-1 text-[11px] font-medium text-white transition hover:bg-slate-700"
+            className="flex items-center gap-1.5 rounded-md bg-slate-900 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-slate-700"
           >
-            <ExternalLink size={10} /> Apply
+            <ExternalLink size={12} /> Apply
           </a>
           <button
             onClick={handleFindLeads}
             disabled={findLeadsState !== "idle"}
-            className="flex items-center gap-1 rounded-md bg-sky-50 border border-sky-200 px-2.5 py-1 text-[11px] font-medium text-sky-700 transition hover:bg-sky-100 disabled:opacity-60"
+            className="flex items-center gap-1.5 rounded-md bg-sky-50 border border-sky-200 px-3 py-1.5 text-xs font-medium text-sky-700 transition hover:bg-sky-100 disabled:opacity-60"
           >
             {findLeadsState !== "idle"
-              ? <Loader2 size={10} className="animate-spin" />
-              : <Users size={10} />}
+              ? <Loader2 size={12} className="animate-spin" />
+              : <Users size={12} />}
             {findLeadsState === "loading"
               ? "Queuing…"
               : findLeadsState === "processing"

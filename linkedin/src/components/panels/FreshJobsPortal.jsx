@@ -107,8 +107,8 @@ function ScrapingLoader({ scrapeState }) {
   );
 }
 
-const SEL = "rounded-md border border-stone-300 bg-white px-2 py-1 text-[11px] text-slate-700 focus:border-sky-400 focus:outline-none";
-const BTN = "rounded-md px-2.5 py-1 text-[11px] font-medium transition disabled:opacity-60";
+const SEL = "rounded-md border border-stone-300 bg-white px-2.5 py-1.5 text-xs text-slate-700 focus:border-sky-400 focus:outline-none";
+const BTN = "rounded-md px-3 py-1.5 text-xs font-medium transition disabled:opacity-60";
 
 export default function FreshJobsPortal() {
   const [activeTab,    setActiveTab]    = useState("fresh");

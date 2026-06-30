@@ -164,28 +164,50 @@
   observer.observe(document.body, { childList: true, subtree: true });
 
   // --- Scroll to load more pages -------------------------------------------
-  // Wellfound uses Apollo/GraphQL infinite scroll: new cards load as you approach
-  // the bottom. We track idle cycles (no new jobs found) instead of checking
-  // atBottom, because atBottom fires before Apollo has had time to load more cards.
-  let scrollInterval = null;
+  // Wellfound uses Apollo/GraphQL infinite scroll. We scroll to the absolute
+  // bottom each cycle (not relative scrollBy) so the IntersectionObserver
+  // sentinel is guaranteed to enter the viewport. We also try scrolling <main>
+  // in case Wellfound uses a non-window scroll container (common in Next.js
+  // fixed-header layouts). Idle-cycle detection stops when no new cards arrive
+  // for MAX_IDLE consecutive cycles (~12s).
+  let scrollContainer = null;
+  let scrollInterval  = null;
+
+  function resolveScrollContainer() {
+    if (scrollContainer) return scrollContainer;
+    const main = document.querySelector("main");
+    if (main && main.scrollHeight > main.clientHeight + 200) {
+      scrollContainer = main;
+    } else {
+      scrollContainer = document.documentElement;
+    }
+    return scrollContainer;
+  }
+
+  function doScroll() {
+    const el = resolveScrollContainer();
+    el.scrollTop = el.scrollHeight; // instant jump to bottom — most reliable trigger
+    window.scrollTo({ top: document.documentElement.scrollHeight, behavior: "smooth" });
+  }
+
   function startScroll() {
-    let cycles = 0;
+    let cycles     = 0;
     let idleCycles = 0;
-    let lastCount = seen.size;
-    const MAX_CYCLES = 28;
-    const MAX_IDLE  = 4;  // 4 × 2000ms = 8s with no new cards → truly done
+    let lastCount  = seen.size;
+    const MAX_CYCLES = 30;
+    const MAX_IDLE   = 5; // 5 × 2200ms ≈ 11s of no new cards → done
 
     scrollInterval = setInterval(() => {
       cycles++;
-      window.scrollBy({ top: 800, behavior: "smooth" });
+      doScroll();
 
-      // Wait 700ms for Apollo to respond to the scroll before checking new cards
+      // Wait 1500ms for Apollo to respond to the scroll before counting cards
       setTimeout(() => {
         scrapeAll(`Scroll ${cycles}`);
 
         if (seen.size > lastCount) {
-          lastCount = seen.size;
-          idleCycles = 0;          // new cards arrived — keep going
+          lastCount  = seen.size;
+          idleCycles = 0;
         } else {
           idleCycles++;
         }
@@ -195,8 +217,8 @@
           flush();
           console.log(`[Wellfound] Done — ${seen.size} jobs (idle=${idleCycles})`);
         }
-      }, 700);
-    }, 2000);
+      }, 1500);
+    }, 2200);
   }
 
   // --- Boot ----------------------------------------------------------------
@@ -204,5 +226,7 @@
   if (initial === 0) {
     [1000, 2500, 5000].forEach(d => setTimeout(() => scrapeAll(`Retry +${d}ms`), d));
   }
-  setTimeout(startScroll, 2200);
+  // Wait 5s for React hydration + Apollo to finish setting up IntersectionObservers
+  // before we start scrolling, otherwise the infinite-scroll sentinel may not exist yet.
+  setTimeout(startScroll, 5000);
 })();
