@@ -39,6 +39,13 @@ const SCRAPE_SOURCES = {
     hostPrefix: "https://hiring.cafe/",
     injectFile: "content/hiringcafe.js",
   },
+  wellfound: {
+    // User's saved Wellfound profile filters apply automatically when logged in:
+    // Software Engineer · Bengaluru · 0-1 years experience · sorted by Most Recent.
+    url: "https://wellfound.com/jobs",
+    hostPrefix: "https://wellfound.com/",
+    injectFile: "content/wellfound.js",
+  },
 };
 
 // NEW: Targeted Company Search

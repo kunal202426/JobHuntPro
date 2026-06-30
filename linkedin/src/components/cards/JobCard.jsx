@@ -20,6 +20,7 @@ const SOURCE_LABELS = {
   cutshort:   "Cutshort",
   instahyre:  "Instahyre",
   hiringcafe: "HiringCafe",
+  wellfound:  "Wellfound",
 };
 
 const STATUS_ACCENT = {
