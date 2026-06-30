@@ -82,20 +82,17 @@ function sortJobs(list, sortBy) {
 function ScrapingLoader({ scrapeState }) {
   const active = scrapeState.filter((s) => s.status === "processing" || s.status === "pending");
   return (
-    <div className="rounded-lg border border-sky-200 bg-sky-50 p-3 mb-1">
+    <div className="col-span-full rounded-xl border border-sky-200 bg-sky-50 p-3">
       <div className="flex items-center gap-2.5">
         <div className="h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-sky-200 border-t-sky-600" />
-        <div className="min-w-0 flex-1">
+        <div className="flex-1 min-w-0">
           <p className="text-xs font-semibold text-sky-900">Scanning job portals…</p>
           {active.length > 0 && (
             <div className="mt-1 flex flex-wrap gap-1">
               {active.map((s) => (
-                <span
-                  key={s.source}
-                  className={`rounded-full px-2 py-0.5 text-[10px] font-semibold capitalize ${
-                    s.status === "processing" ? "bg-sky-600 text-white" : "bg-sky-100 text-sky-700"
-                  }`}
-                >
+                <span key={s.source} className={`rounded-full px-2 py-0.5 text-[10px] font-semibold capitalize ${
+                  s.status === "processing" ? "bg-sky-600 text-white" : "bg-sky-100 text-sky-700"
+                }`}>
                   {s.status === "processing" ? "⟳ " : "· "}{s.source}
                 </span>
               ))}
@@ -110,7 +107,8 @@ function ScrapingLoader({ scrapeState }) {
   );
 }
 
-const SEL_CLS = "rounded border border-stone-300 bg-white px-2 py-1 text-[11px] text-slate-700 focus:border-sky-400 focus:outline-none";
+const SEL = "rounded-md border border-stone-300 bg-white px-2 py-1 text-[11px] text-slate-700 focus:border-sky-400 focus:outline-none";
+const BTN = "rounded-md px-2.5 py-1 text-[11px] font-medium transition disabled:opacity-60";
 
 export default function FreshJobsPortal() {
   const [activeTab,    setActiveTab]    = useState("fresh");
@@ -121,6 +119,7 @@ export default function FreshJobsPortal() {
   const [dateFilter,   setDateFilter]   = useState("all");
 
   const [showFilters,       setShowFilters]       = useState(false);
+  const [showScrape,        setShowScrape]        = useState(false);
   const [scrapeSource,      setScrapeSource]      = useState("linkedin");
   const [scrapeBusy,        setScrapeBusy]        = useState(false);
   const [cleanupBusy,       setCleanupBusy]       = useState(false);
@@ -166,8 +165,13 @@ export default function FreshJobsPortal() {
   const hasLoginRequired   = scrapeState.some((s) => s.status === "login_required");
 
   useEffect(() => {
-    if (hasLoginRequired) setShowStatusPanel(true);
+    if (hasLoginRequired) { setShowStatusPanel(true); setShowScrape(true); }
   }, [hasLoginRequired]);
+
+  // Auto-open scrape panel while scraping
+  useEffect(() => {
+    if (isActivelyScraping) setShowScrape(true);
+  }, [isActivelyScraping]);
 
   async function triggerScrape() {
     if (!extDetected) {
@@ -254,7 +258,7 @@ export default function FreshJobsPortal() {
     setApplyBusy(true);
     try {
       const res = await client.post("/api/apply/instahyre");
-      toast.success(`Queued ${res.data?.queued ?? 0} job(s) — applying in the background…`, { duration: 4000 });
+      toast.success(`Queued ${res.data?.queued ?? 0} job(s) — applying in background…`, { duration: 4000 });
       window.dispatchEvent(new CustomEvent("jh:trigger-apply"));
     } catch (err) {
       toast.error(err.response?.data?.error || "Failed to queue applications.");
@@ -268,9 +272,7 @@ export default function FreshJobsPortal() {
       await client.post("/api/apply/stop");
       setApplyCounts((c) => ({ ...(c || {}), pending: 0, processing: 0 }));
       toast.success("Apply run cancelled.");
-    } catch {
-      toast.error("Failed to cancel.");
-    }
+    } catch { toast.error("Failed to cancel."); }
   }
 
   async function cleanupOldJobs() {
@@ -279,11 +281,7 @@ export default function FreshJobsPortal() {
       const res = await client.post("/api/jobs/cleanup-old", { hours: 24, include_active: false });
       toast.success(`Deleted ${res.data?.deleted || 0} old jobs.`);
       await refetch();
-    } catch {
-      toast.error("Failed to delete old jobs.");
-    } finally {
-      setCleanupBusy(false);
-    }
+    } catch { toast.error("Failed to delete old jobs."); } finally { setCleanupBusy(false); }
   }
 
   if (error === "backend_offline") {
@@ -316,25 +314,15 @@ export default function FreshJobsPortal() {
   return (
     <section className="flex h-full flex-col overflow-hidden bg-stone-50">
 
-      {/* ── Compact toolbar ──────────────────────────────────── */}
+      {/* ── Toolbar ─────────────────────────────────────────── */}
       <div className="shrink-0 border-b border-stone-200 bg-white/95 px-3 py-2 backdrop-blur space-y-1.5">
 
-        {/* Login warning */}
-        {hasLoginRequired && !isActivelyScraping && (
-          <button
-            onClick={() => setShowStatusPanel(true)}
-            className="flex w-full items-center gap-1.5 rounded border border-rose-200 bg-rose-50 px-2.5 py-1.5 text-left text-[11px] text-rose-700 hover:bg-rose-100 transition"
-          >
-            <span>⚠️</span> Login required on some portals — tap to see Status
-          </button>
-        )}
-
-        {/* Row 1: Tab switcher + filter toggle */}
-        <div className="flex items-center gap-2">
+        {/* Row 1: Tabs + Filter toggle + Scrape toggle */}
+        <div className="flex items-center gap-1.5">
           <div className="flex gap-0.5 rounded-md bg-stone-100 p-0.5 flex-1">
             {[
-              { id: "fresh",        label: `Fresh Jobs (${freshJobs.length})`      },
-              { id: "applications", label: `My Applications (${myApps.length})`    },
+              { id: "fresh",        label: `Fresh Jobs (${freshJobs.length})`   },
+              { id: "applications", label: `Applications (${myApps.length})`    },
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -342,7 +330,7 @@ export default function FreshJobsPortal() {
                 className={`flex-1 rounded py-0.5 text-[11px] font-medium transition ${
                   activeTab === tab.id
                     ? "bg-white text-slate-900 shadow-sm"
-                    : "text-slate-500 hover:text-slate-900"
+                    : "text-slate-500 hover:text-slate-800"
                 }`}
               >
                 {tab.label}
@@ -350,9 +338,10 @@ export default function FreshJobsPortal() {
             ))}
           </div>
 
+          {/* Filters toggle */}
           <button
             onClick={() => setShowFilters((v) => !v)}
-            className={`flex shrink-0 items-center gap-1 rounded border px-2 py-1 text-[11px] font-medium transition ${
+            className={`flex items-center gap-1 rounded-md border px-2 py-1 text-[11px] font-medium transition ${
               showFilters
                 ? "border-sky-300 bg-sky-50 text-sky-700"
                 : "border-stone-200 bg-stone-50 text-slate-600 hover:bg-stone-100"
@@ -363,48 +352,58 @@ export default function FreshJobsPortal() {
               <span className="ml-0.5 inline-block h-1.5 w-1.5 rounded-full bg-sky-600" />
             )}
           </button>
+
+          {/* Scrape toggle */}
+          <button
+            onClick={() => setShowScrape((v) => !v)}
+            className={`flex items-center gap-1 rounded-md border px-2 py-1 text-[11px] font-medium transition ${
+              showScrape
+                ? "border-slate-400 bg-slate-900 text-white"
+                : isActivelyScraping
+                ? "animate-pulse border-sky-300 bg-sky-50 text-sky-700"
+                : "border-stone-200 bg-stone-50 text-slate-600 hover:bg-stone-100"
+            }`}
+          >
+            {showScrape ? "▾" : "▸"}
+            {isActivelyScraping ? " Running…" : " Scrape"}
+          </button>
         </div>
 
-        {/* Filters panel (collapsible) */}
+        {/* ── Filters panel (collapsible) ──────────────────── */}
         {showFilters && (
           <div className="space-y-1.5 rounded-lg border border-stone-200 bg-stone-50 p-2">
-            {/* Date filter */}
             <div className="flex flex-wrap gap-1">
               {DATE_FILTERS.map((df) => (
                 <button
                   key={df.value}
                   onClick={() => setDateFilter(df.value)}
                   className={`rounded-full px-2 py-0.5 text-[10px] font-medium transition ${
-                    dateFilter === df.value
-                      ? "bg-sky-600 text-white"
-                      : "bg-stone-100 text-slate-500 hover:bg-stone-200"
+                    dateFilter === df.value ? "bg-sky-600 text-white" : "bg-stone-100 text-slate-500 hover:bg-stone-200"
                   }`}
                 >
                   {df.label}
                 </button>
               ))}
             </div>
-            {/* Source + smart */}
             <div className="grid grid-cols-2 gap-1.5">
-              <select value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value)} className={SEL_CLS}>
+              <select value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value)} className={SEL}>
                 {SOURCES.map((s) => (
                   <option key={s} value={s}>{s === "all" ? "All Sources" : s.charAt(0).toUpperCase() + s.slice(1)}</option>
                 ))}
               </select>
-              <select value={smartFilter} onChange={(e) => setSmartFilter(e.target.value)} className={SEL_CLS}>
+              <select value={smartFilter} onChange={(e) => setSmartFilter(e.target.value)} className={SEL}>
                 {SMART_FILTERS.map((f) => <option key={f.id} value={f.id}>{f.label}</option>)}
               </select>
             </div>
-            {/* Search + sort */}
             <div className="grid grid-cols-[1fr_auto] gap-1.5">
               <input
                 type="text"
-                placeholder="Search: title, company, skills…"
+                placeholder="Search title, company, skills…"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className={SEL_CLS + " w-full"}
+                className={SEL + " w-full"}
               />
-              <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className={SEL_CLS}>
+              <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className={SEL}>
                 <option value="newest">Newest</option>
                 <option value="score">Best Score</option>
                 <option value="company">Company</option>
@@ -413,165 +412,178 @@ export default function FreshJobsPortal() {
           </div>
         )}
 
-        {/* Row 2: Scrape controls + Easy Apply (one row) */}
-        <div className="flex items-center gap-1.5">
-          <select
-            value={scrapeSource}
-            onChange={(e) => setScrapeSource(e.target.value)}
-            className={SEL_CLS + " w-28"}
-          >
-            <option value="linkedin">LinkedIn</option>
-            <option value="naukri">Naukri</option>
-            <option value="cutshort">Cutshort</option>
-            <option value="instahyre">Instahyre</option>
-            <option value="hiringcafe">Hiring Cafe</option>
-            <option value="all">All portals</option>
-          </select>
-
-          <button
-            onClick={triggerScrape}
-            disabled={scrapeBusy || isActivelyScraping}
-            className="rounded bg-slate-900 px-3 py-1 text-[11px] font-medium text-white transition hover:bg-slate-700 disabled:opacity-60"
-          >
-            {scrapeBusy ? "Queuing…" : isActivelyScraping ? "Running…" : "⚡ Scrape"}
-          </button>
-
-          <button
-            onClick={() => setShowStatusPanel((v) => !v)}
-            title="Scrape status & options"
-            className={`rounded border px-2 py-1 text-[11px] transition ${
-              isActivelyScraping
-                ? "animate-pulse border-sky-300 bg-sky-50 text-sky-700"
-                : hasLoginRequired
-                ? "border-rose-300 bg-rose-50 text-rose-700"
-                : "border-stone-200 bg-stone-50 text-slate-600 hover:bg-stone-100"
-            }`}
-          >
-            {isActivelyScraping ? "●" : "≡"} Status
-          </button>
-
-          <div className="mx-0.5 h-4 w-px shrink-0 bg-stone-200" />
-
-          <button
-            onClick={handleEasyApplyInstahyre}
-            disabled={applyBusy || applyActive || instahyreToApply === 0}
-            title="Auto-apply to all Instahyre jobs in one click"
-            className="flex-1 rounded bg-emerald-600 px-2.5 py-1 text-[11px] font-medium text-white transition hover:bg-emerald-500 disabled:opacity-60"
-          >
-            {applyActive
-              ? `Applying… ${applyLeft} left`
-              : applyBusy
-              ? "Queuing…"
-              : `⚡ Instahyre${instahyreToApply ? ` (${instahyreToApply})` : ""}`}
-          </button>
-
-          {applyActive && (
-            <button
-              onClick={cancelApply}
-              title="Cancel applying"
-              className="rounded border border-rose-300 bg-rose-50 px-2 py-1 text-[11px] font-medium text-rose-700 transition hover:bg-rose-100"
-            >
-              ✕
-            </button>
-          )}
-        </div>
-
-        {/* Row 3: Company search */}
-        <div className="flex items-center gap-1.5">
-          <input
-            type="text"
-            placeholder="Company: e.g. Google"
-            value={companyQuery}
-            onChange={(e) => setCompanyQuery(e.target.value)}
-            className={SEL_CLS + " flex-1"}
-          />
-          <select
-            value={companySource}
-            onChange={(e) => setCompanySource(e.target.value)}
-            className={SEL_CLS + " w-28"}
-          >
-            <option value="all">All portals</option>
-            <option value="linkedin">LinkedIn</option>
-            <option value="naukri">Naukri</option>
-            <option value="instahyre">Instahyre</option>
-            <option value="hiringcafe">Hiring Cafe</option>
-          </select>
-          <button
-            onClick={triggerCompanyScrape}
-            disabled={companyScrapeBusy || isActivelyScraping}
-            className="rounded bg-sky-600 px-2.5 py-1 text-[11px] font-medium text-white transition hover:bg-sky-500 disabled:opacity-60"
-          >
-            {companyScrapeBusy ? "Queuing…" : "Search"}
-          </button>
-        </div>
-
-        {/* Status panel (collapsible) */}
-        {showStatusPanel && (
+        {/* ── Scrape panel (collapsible) ──────────────────── */}
+        {showScrape && (
           <div className="space-y-1.5 rounded-lg border border-stone-200 bg-stone-50 p-2">
-            {!extDetected && (
-              <div className="flex items-start gap-1.5 rounded border border-amber-200 bg-amber-50 px-2 py-1.5">
-                <span className="text-amber-600 text-xs">⚠</span>
-                <p className="text-[11px] leading-relaxed text-amber-800">
-                  Extension not detected. Install from <strong>Settings → Chrome Extension</strong>.
-                </p>
+
+            {/* Login warning */}
+            {hasLoginRequired && !isActivelyScraping && (
+              <div className="flex items-center gap-1.5 rounded border border-rose-200 bg-rose-50 px-2 py-1.5">
+                <span className="text-xs">⚠️</span>
+                <p className="text-[11px] text-rose-700">Login required on some portals — see Status below.</p>
               </div>
             )}
-            {scrapeState.length > 0 && (
-              <div className="grid grid-cols-3 gap-1">
-                {scrapeState.map((state) => {
-                  const color =
-                    state.status === "completed"      ? "text-emerald-700"
-                    : state.status === "login_required" ? "text-rose-700"
-                    : state.status === "processing"     ? "text-sky-700"
-                    : "text-slate-500";
-                  return (
-                    <div key={state.source} className="rounded border border-stone-200 bg-white px-2 py-1">
-                      <div className="text-[10px] capitalize font-medium text-slate-700">{state.source}</div>
-                      <div className={`text-[10px] ${color}`}>{state.status}</div>
-                      {state.status === "login_required" && (
-                        <div className="text-[9px] text-rose-600">Login then Scrape again.</div>
-                      )}
-                    </div>
-                  );
-                })}
+
+            {/* Row A: Portal scrape + Instahyre apply */}
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <select value={scrapeSource} onChange={(e) => setScrapeSource(e.target.value)} className={SEL + " w-28"}>
+                <option value="linkedin">LinkedIn</option>
+                <option value="naukri">Naukri</option>
+                <option value="cutshort">Cutshort</option>
+                <option value="instahyre">Instahyre</option>
+                <option value="hiringcafe">Hiring Cafe</option>
+                <option value="all">All portals</option>
+              </select>
+
+              <button
+                onClick={triggerScrape}
+                disabled={scrapeBusy || isActivelyScraping}
+                className={`${BTN} bg-slate-900 text-white hover:bg-slate-700`}
+              >
+                {scrapeBusy ? "Queuing…" : isActivelyScraping ? "Running…" : "⚡ Scrape"}
+              </button>
+
+              <button
+                onClick={() => setShowStatusPanel((v) => !v)}
+                className={`${BTN} border ${
+                  isActivelyScraping
+                    ? "border-sky-300 bg-sky-50 text-sky-700"
+                    : hasLoginRequired
+                    ? "border-rose-300 bg-rose-50 text-rose-700"
+                    : "border-stone-300 bg-white text-slate-600 hover:bg-stone-100"
+                }`}
+              >
+                {isActivelyScraping ? "● Status" : "≡ Status"}
+              </button>
+
+              <div className="mx-0.5 h-4 w-px shrink-0 bg-stone-300" />
+
+              {/* Instahyre easy apply — compact, not full-width */}
+              <button
+                onClick={handleEasyApplyInstahyre}
+                disabled={applyBusy || applyActive || instahyreToApply === 0}
+                title="Auto-apply to all Instahyre jobs"
+                className={`${BTN} ${
+                  applyActive
+                    ? "bg-emerald-100 text-emerald-800 border border-emerald-300"
+                    : "bg-emerald-600 text-white hover:bg-emerald-500"
+                }`}
+              >
+                {applyActive
+                  ? `Applying… ${applyLeft} left`
+                  : applyBusy
+                  ? "Queuing…"
+                  : `⚡ IH Apply${instahyreToApply ? ` (${instahyreToApply})` : ""}`}
+              </button>
+
+              {applyActive && (
+                <button
+                  onClick={cancelApply}
+                  className={`${BTN} border border-rose-300 bg-rose-50 text-rose-700 hover:bg-rose-100`}
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+
+            {/* Row B: Company search */}
+            <div className="flex items-center gap-1.5">
+              <input
+                type="text"
+                placeholder="Company: e.g. Google"
+                value={companyQuery}
+                onChange={(e) => setCompanyQuery(e.target.value)}
+                className={SEL + " flex-1"}
+              />
+              <select value={companySource} onChange={(e) => setCompanySource(e.target.value)} className={SEL + " w-28"}>
+                <option value="all">All portals</option>
+                <option value="linkedin">LinkedIn</option>
+                <option value="naukri">Naukri</option>
+                <option value="instahyre">Instahyre</option>
+                <option value="hiringcafe">Hiring Cafe</option>
+              </select>
+              <button
+                onClick={triggerCompanyScrape}
+                disabled={companyScrapeBusy || isActivelyScraping}
+                className={`${BTN} bg-sky-600 text-white hover:bg-sky-500`}
+              >
+                {companyScrapeBusy ? "Queuing…" : "Search"}
+              </button>
+            </div>
+
+            {/* Status detail panel */}
+            {showStatusPanel && (
+              <div className="space-y-1.5">
+                {!extDetected && (
+                  <div className="flex items-start gap-1.5 rounded border border-amber-200 bg-amber-50 px-2 py-1.5">
+                    <span className="text-amber-600 text-xs">⚠</span>
+                    <p className="text-[11px] leading-relaxed text-amber-800">
+                      Extension not detected. Install from <strong>Settings → Chrome Extension</strong>.
+                    </p>
+                  </div>
+                )}
+                {scrapeState.length > 0 && (
+                  <div className="grid grid-cols-3 gap-1">
+                    {scrapeState.map((state) => {
+                      const color =
+                        state.status === "completed"      ? "text-emerald-700"
+                        : state.status === "login_required" ? "text-rose-700"
+                        : state.status === "processing"     ? "text-sky-700"
+                        : "text-slate-500";
+                      return (
+                        <div key={state.source} className="rounded-md border border-stone-200 bg-white px-2 py-1">
+                          <div className="text-[10px] capitalize font-medium text-slate-700">{state.source}</div>
+                          <div className={`text-[10px] ${color}`}>{state.status}</div>
+                          {state.status === "login_required" && (
+                            <div className="text-[9px] text-rose-600">Login then Scrape again.</div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+                <button
+                  onClick={cleanupOldJobs}
+                  disabled={cleanupBusy}
+                  className={`${BTN} w-full border border-stone-300 bg-white text-slate-600 hover:bg-stone-100`}
+                >
+                  {cleanupBusy ? "Deleting…" : "Delete Old Jobs (>24h)"}
+                </button>
               </div>
             )}
-            <button
-              onClick={cleanupOldJobs}
-              disabled={cleanupBusy}
-              className="w-full rounded border border-stone-300 bg-white px-2 py-1 text-[11px] text-slate-600 hover:bg-stone-100 disabled:opacity-60 transition"
-            >
-              {cleanupBusy ? "Deleting…" : "Delete Old Jobs (>24h)"}
-            </button>
           </div>
         )}
       </div>
 
-      {/* ── Job list ─────────────────────────────────────────── */}
-      <div className="flex-1 space-y-2 overflow-y-auto p-3">
-        {isActivelyScraping && <ScrapingLoader scrapeState={scrapeState} />}
+      {/* ── Job grid ─────────────────────────────────────────── */}
+      <div className="flex-1 overflow-y-auto p-3">
+        <div className="grid grid-cols-1 gap-2.5 md:grid-cols-2">
+          {isActivelyScraping && <ScrapingLoader scrapeState={scrapeState} />}
 
-        {loading ? (
-          <p className="py-8 text-center text-xs text-slate-500">Loading jobs...</p>
-        ) : filtered.length === 0 ? (
-          <EmptyState
-            message={
-              activeTab === "fresh"
-                ? "No jobs yet. Pick a source above and click ⚡ Scrape."
-                : "No applications tracked yet. Change status to Applied on any job card."
-            }
-          />
-        ) : (
-          filtered.map((job) => (
-            <JobCard
-              key={job.id}
-              job={job}
-              onStatusChange={updateStatus}
-              onDismiss={dismissJob}
-              showAppliedDate={activeTab === "applications"}
-            />
-          ))
-        )}
+          {loading ? (
+            <p className="col-span-full py-8 text-center text-xs text-slate-500">Loading jobs...</p>
+          ) : filtered.length === 0 ? (
+            <div className="col-span-full">
+              <EmptyState
+                message={
+                  activeTab === "fresh"
+                    ? "No jobs yet. Click ▸ Scrape above to fetch fresh listings."
+                    : "No applications tracked yet. Change status to Applied on any job card."
+                }
+              />
+            </div>
+          ) : (
+            filtered.map((job) => (
+              <JobCard
+                key={job.id}
+                job={job}
+                onStatusChange={updateStatus}
+                onDismiss={dismissJob}
+                showAppliedDate={activeTab === "applications"}
+              />
+            ))
+          )}
+        </div>
       </div>
 
     </section>
