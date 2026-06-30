@@ -315,11 +315,12 @@ export default function FreshJobsPortal() {
     <section className="flex h-full flex-col overflow-hidden bg-stone-50">
 
       {/* ── Toolbar ─────────────────────────────────────────── */}
-      <div className="shrink-0 border-b border-stone-200 bg-white/95 px-3 py-2 backdrop-blur space-y-1.5">
+      <div className="shrink-0 border-b border-stone-200 bg-white/95 px-3 py-2.5 backdrop-blur space-y-2">
 
-        {/* Row 1: Tabs + Filter toggle + Scrape toggle */}
-        <div className="flex items-center gap-1.5">
-          <div className="flex gap-0.5 rounded-md bg-stone-100 p-0.5 flex-1">
+        {/* Row 1: Tabs (left) + Filter & Scrape toggles (right) */}
+        <div className="flex items-center justify-between gap-2">
+          {/* Tab switcher — natural width, not stretched */}
+          <div className="flex gap-0.5 rounded-lg bg-stone-100 p-1">
             {[
               { id: "fresh",        label: `Fresh Jobs (${freshJobs.length})`   },
               { id: "applications", label: `Applications (${myApps.length})`    },
@@ -327,7 +328,7 @@ export default function FreshJobsPortal() {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex-1 rounded py-0.5 text-[11px] font-medium transition ${
+                className={`rounded-md px-3 py-1.5 text-xs font-medium transition ${
                   activeTab === tab.id
                     ? "bg-white text-slate-900 shadow-sm"
                     : "text-slate-500 hover:text-slate-800"
@@ -338,35 +339,38 @@ export default function FreshJobsPortal() {
             ))}
           </div>
 
-          {/* Filters toggle */}
-          <button
-            onClick={() => setShowFilters((v) => !v)}
-            className={`flex items-center gap-1 rounded-md border px-2 py-1 text-[11px] font-medium transition ${
-              showFilters
-                ? "border-sky-300 bg-sky-50 text-sky-700"
-                : "border-stone-200 bg-stone-50 text-slate-600 hover:bg-stone-100"
-            }`}
-          >
-            {showFilters ? "▾" : "▸"} Filters
-            {!showFilters && hasActiveFilter && (
-              <span className="ml-0.5 inline-block h-1.5 w-1.5 rounded-full bg-sky-600" />
-            )}
-          </button>
+          {/* Right-side toggles */}
+          <div className="flex items-center gap-1.5">
+            {/* Filters toggle */}
+            <button
+              onClick={() => setShowFilters((v) => !v)}
+              className={`flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium transition ${
+                showFilters
+                  ? "border-sky-300 bg-sky-50 text-sky-700"
+                  : "border-stone-200 bg-stone-50 text-slate-600 hover:bg-stone-100"
+              }`}
+            >
+              {showFilters ? "▾" : "▸"} Filters
+              {!showFilters && hasActiveFilter && (
+                <span className="inline-block h-1.5 w-1.5 rounded-full bg-sky-600" />
+              )}
+            </button>
 
-          {/* Scrape toggle */}
-          <button
-            onClick={() => setShowScrape((v) => !v)}
-            className={`flex items-center gap-1 rounded-md border px-2 py-1 text-[11px] font-medium transition ${
-              showScrape
-                ? "border-slate-400 bg-slate-900 text-white"
-                : isActivelyScraping
-                ? "animate-pulse border-sky-300 bg-sky-50 text-sky-700"
-                : "border-stone-200 bg-stone-50 text-slate-600 hover:bg-stone-100"
-            }`}
-          >
-            {showScrape ? "▾" : "▸"}
-            {isActivelyScraping ? " Running…" : " Scrape"}
-          </button>
+            {/* Scrape toggle */}
+            <button
+              onClick={() => setShowScrape((v) => !v)}
+              className={`flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium transition ${
+                showScrape
+                  ? "border-slate-500 bg-slate-900 text-white"
+                  : isActivelyScraping
+                  ? "animate-pulse border-sky-300 bg-sky-50 text-sky-700"
+                  : "border-stone-200 bg-stone-50 text-slate-600 hover:bg-stone-100"
+              }`}
+            >
+              {showScrape ? "▾" : "▸"}
+              {isActivelyScraping ? " Running…" : " Scrape"}
+            </button>
+          </div>
         </div>
 
         {/* ── Filters panel (collapsible) ──────────────────── */}
