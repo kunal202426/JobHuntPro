@@ -60,14 +60,20 @@
     return clean(h2) || null;
   }
 
+  // Known Wellfound nav paths that start with /jobs/ but aren't job listings
+  const NAV_PATHS = new Set(["/jobs", "/jobs/starred", "/jobs/hidden", "/jobs/applications", "/jobs/messages"]);
+
   function extractJob(link) {
     try {
       const href = link.getAttribute("href") || "";
-      // Job hrefs look like /jobs/1234567-some-title (digit after /jobs/)
-      if (!/^\/jobs\/\d/.test(href)) return null;
+      if (!href.startsWith("/jobs/") || NAV_PATHS.has(href)) return null;
 
       const job_url = HOST + href;
-      const title = clean(link.querySelector('[class*="title"]'));
+      // Prefer the CSS-module title span (class contains "title__") over the titleBar wrapper div
+      const titleEl =
+        link.querySelector('[class*="title__"]') ||
+        link.querySelector('[class*="title"]');
+      const title = clean(titleEl);
       if (!title) return null;
 
       // Skip obviously senior/lead titles if the shared filter is available
@@ -158,22 +164,39 @@
   observer.observe(document.body, { childList: true, subtree: true });
 
   // --- Scroll to load more pages -------------------------------------------
+  // Wellfound uses Apollo/GraphQL infinite scroll: new cards load as you approach
+  // the bottom. We track idle cycles (no new jobs found) instead of checking
+  // atBottom, because atBottom fires before Apollo has had time to load more cards.
   let scrollInterval = null;
   function startScroll() {
     let cycles = 0;
+    let idleCycles = 0;
+    let lastCount = seen.size;
+    const MAX_CYCLES = 28;
+    const MAX_IDLE  = 4;  // 4 × 2000ms = 8s with no new cards → truly done
+
     scrollInterval = setInterval(() => {
       cycles++;
-      window.scrollBy({ top: 900, behavior: "smooth" });
-      const atBottom = window.scrollY + window.innerHeight >= document.documentElement.scrollHeight - 150;
-      if (atBottom || cycles >= 20) {
-        clearInterval(scrollInterval);
-        setTimeout(() => {
-          scrapeAll("Final sweep");
+      window.scrollBy({ top: 800, behavior: "smooth" });
+
+      // Wait 700ms for Apollo to respond to the scroll before checking new cards
+      setTimeout(() => {
+        scrapeAll(`Scroll ${cycles}`);
+
+        if (seen.size > lastCount) {
+          lastCount = seen.size;
+          idleCycles = 0;          // new cards arrived — keep going
+        } else {
+          idleCycles++;
+        }
+
+        if (idleCycles >= MAX_IDLE || cycles >= MAX_CYCLES) {
+          clearInterval(scrollInterval);
           flush();
-          console.log(`[Wellfound] Done — ${seen.size} jobs`);
-        }, 1000);
-      }
-    }, 1800);
+          console.log(`[Wellfound] Done — ${seen.size} jobs (idle=${idleCycles})`);
+        }
+      }, 700);
+    }, 2000);
   }
 
   // --- Boot ----------------------------------------------------------------
