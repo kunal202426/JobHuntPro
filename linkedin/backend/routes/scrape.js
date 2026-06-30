@@ -4,7 +4,7 @@ import { getRow, getRows, execute } from "../db/client.js";
 
 const router = Router();
 
-const SOURCES = ["linkedin", "naukri", "cutshort", "instahyre", "hiringcafe"];
+const SOURCES = ["linkedin", "naukri", "cutshort", "instahyre", "hiringcafe", "wellfound"];
 // NEW: Targeted Company Search
 const COMPANY_SOURCES = ["linkedin", "naukri", "instahyre", "hiringcafe"];
 
