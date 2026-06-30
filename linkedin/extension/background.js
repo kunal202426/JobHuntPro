@@ -31,10 +31,11 @@ const SCRAPE_SOURCES = {
     injectFile: "content/instahyre.js",
   },
   hiringcafe: {
-    // searchState={"dateFetchedPastNDays":1,"sortBy":"date"} → freshest first.
-    // Location defaults to the user's country (India) via IP geo, same as the
-    // site's own pagination links. SSR embeds jobs in __NEXT_DATA__.
-    url: "https://hiring.cafe/?searchState=%7B%22dateFetchedPastNDays%22%3A1%2C%22sortBy%22%3A%22date%22%7D",
+    // Targeted at the SOURCE: searchQuery "Software Engineer" + the 4 tech
+    // departments + roleYoeRange [0,1] (junior) + sortBy date. The scraper then
+    // only trims to the last 24h. Location = India via IP geo. SSR embeds jobs in
+    // __NEXT_DATA__.
+    url: "https://hiring.cafe/?searchState=%7B%22searchQuery%22%3A%22Software+Engineer%22%2C%22dateFetchedPastNDays%22%3A2%2C%22departments%22%3A%5B%22Software+Development%22%2C%22Engineering%22%2C%22Information+Technology%22%2C%22Data+and+Analytics%22%5D%2C%22roleYoeRange%22%3A%5B0%2C1%5D%2C%22sortBy%22%3A%22date%22%7D",
     hostPrefix: "https://hiring.cafe/",
     injectFile: "content/hiringcafe.js",
   },
@@ -69,7 +70,14 @@ function buildCompanySearchUrl(source, company) {
     return `https://www.instahyre.com/jobs/?search=${encoded}`;
   }
   if (source === "hiringcafe") {
-    const state = JSON.stringify({ searchQuery: company, sortBy: "date" });
+    // Same junior + tech-department filter, keyed to the company as the search term.
+    const state = JSON.stringify({
+      searchQuery: company,
+      dateFetchedPastNDays: 2,
+      departments: ["Software Development", "Engineering", "Information Technology", "Data and Analytics"],
+      roleYoeRange: [0, 1],
+      sortBy: "date",
+    });
     return `https://hiring.cafe/?searchState=${encodeURIComponent(state)}`;
   }
   return null;

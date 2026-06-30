@@ -145,15 +145,20 @@ freshness/experience/domain, don't rip out relevance.
 - **hiringcafe** (`content/hiringcafe.js`): **scrape-only** (links out, no native
   apply). It does NOT scrape DOM cards — it reads the Next.js SSR blob
   `document.getElementById("__NEXT_DATA__")` → `props.pageProps.ssrHits` (40
-  structured jobs/page), and same-origin `fetch()`es `?page=1..4` (each page is
+  structured jobs/page), and same-origin `fetch()`es `?page=1..N` (each page is
   server-rendered so `__NEXT_DATA__` comes back in the HTML — no reload, the
-  content script stays alive). Filters on **structured fields**:
-  `v5_processed_job_data.min_industry_and_role_yoe ≤ 2`, drop `seniority_level ===
-  "Senior Level"`, keep `job_category` Software Development / Data and Analytics
-  (or a strong software keyword), freshness via exact `estimated_publish_date_millis`,
-  plus `__jhJobFilter.isExcludedTitle`. `job_url = hit.apply_url`. SCRAPE_SOURCES
-  url is `searchState={"dateFetchedPastNDays":1,"sortBy":"date"}`; India comes from
-  Hiring Cafe's IP geo default (same as their own pagination links).
+  content script stays alive; newest-first, so it early-stops once a page is all
+  stale). **Relevance/experience/department are enforced at the SOURCE** by the
+  searchState URL, so the client does **only** a ~24h freshness cut (via exact
+  `estimated_publish_date_millis`) — nothing else. SCRAPE_SOURCES url's searchState
+  is `{searchQuery:"Software Engineer", dateFetchedPastNDays:2, departments:[
+  "Software Development","Engineering","Information Technology","Data and Analytics"],
+  roleYoeRange:[0,1], sortBy:"date"}`. `job_url = hit.apply_url`. India = IP geo
+  default. (Earlier the scraper pointed at a generic India feed + strict client
+  filters and yielded only ~6-7 jobs; the lever is always the searchState URL — to
+  change what's scraped, edit that, not the client filter. Hiring Cafe's searchState
+  keys: `searchQuery`, `departments[]`, `roleYoeRange:[min,max]`, `seniorityLevel`,
+  `dateFetchedPastNDays`, `sortBy`, `locations`.)
 
 ### 5e. Instahyre one-click bulk auto-apply (the only auto-apply)
 - Frontend: "⚡ Easy Apply Instahyre" button + "✕ Cancel" in `FreshJobsPortal.jsx`,
