@@ -280,6 +280,21 @@ async function processOneConnection() {
 
   if (!(await hasActiveSession())) return "stopped";
 
+  // Belt-and-suspenders: confirm the tab is still actually showing the
+  // profile we just navigated it to before sending the connect command.
+  // Guards against this same tab getting re-navigated (a stray trigger, a
+  // service-worker restart mid-loop, etc.) in the gap between navigating and
+  // messaging it — the content script re-checks this too, right before its
+  // own irreversible clicks, but catching it here means we never even ask.
+  const targetPath = person.profile_url.replace(/^https?:\/\/[^/]+/, "").split("?")[0].replace(/\/$/, "");
+  const checkTab = await chrome.tabs.get(targetTab.id).catch(() => null);
+  const currentPath = checkTab?.url ? new URL(checkTab.url).pathname.replace(/\/$/, "") : "";
+  if (targetPath && !currentPath.startsWith(targetPath)) {
+    console.warn(`[bg] Tab drifted before DO_CONNECT: expected ${targetPath}, tab is on ${currentPath || "(unknown)"}`);
+    await postToBackend("/api/queue/result", { queue_id: person.id, status: "failed", error_msg: "tab_url_mismatch" }).catch(() => {});
+    return "done";
+  }
+
   try {
     const response = await sendMessageToTabWithInjection(targetTab.id, {
       type: "DO_CONNECT",

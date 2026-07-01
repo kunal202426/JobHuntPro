@@ -587,6 +587,20 @@ async function handleConnectModal() {
   return "send_unconfirmed";
 }
 
+// A background service-worker restart, or an overlapping trigger, can
+// re-point this tab at a different profile mid-flight. attemptConnect takes
+// several seconds end to end (waiting for the top card, opening the More
+// menu, waiting for the invite modal) — checking the URL only once at the
+// start isn't enough to guarantee the button we eventually click still
+// belongs to the person we started with. Re-checked right before every
+// irreversible click (Connect, and Send without a note).
+function isOnTargetProfile(profile_url) {
+  if (!profile_url) return true;
+  const targetPath = profile_url.replace(/^https?:\/\/[^/]+/, "").split("?")[0].replace(/\/$/, "");
+  const currentPath = window.location.pathname.replace(/\/$/, "");
+  return !targetPath || currentPath.startsWith(targetPath);
+}
+
 async function attemptConnect(profile_url) {
   if (isCheckpointPage()) {
     return { status: "failed", error: "captcha_checkpoint" };
@@ -606,17 +620,18 @@ async function attemptConnect(profile_url) {
     waited += 400;
   }
 
-  // Verify we're on the correct profile
-  if (profile_url) {
-    const targetPath = profile_url.replace(/^https?:\/\/[^/]+/, "").split("?")[0].replace(/\/$/, "");
-    const currentPath = window.location.pathname.replace(/\/$/, "");
-    if (targetPath && !currentPath.startsWith(targetPath)) {
-      return { status: "failed", error: "wrong_page" };
-    }
+  if (!isOnTargetProfile(profile_url)) {
+    return { status: "failed", error: "wrong_page" };
   }
 
   if (isAlreadyConnected()) return { status: "already_connected" };
   if (isAlreadyInvited())    return { status: "already_pending" };
+
+  // Re-check right before the irreversible click — the tab may have been
+  // re-navigated by another trigger during the waits above.
+  if (!isOnTargetProfile(profile_url)) {
+    return { status: "failed", error: "wrong_page_before_click" };
+  }
 
   // Case A: a directly-visible Connect button (rare on the new UI).
   const directBtn = findDirectConnectButton();
@@ -633,6 +648,12 @@ async function attemptConnect(profile_url) {
       if (isFollowOnly()) return { status: "no_button", error: "follow_only" };
       return { status: "no_button", error: "connect_button_not_found" };
     }
+  }
+
+  // One more check before "Send without a note" — this is the point of no
+  // return, so it's the most important place to catch a hijacked tab.
+  if (!isOnTargetProfile(profile_url)) {
+    return { status: "failed", error: "wrong_page_before_send" };
   }
 
   // Single place that finds the invite modal, clicks "Send without a note", and
