@@ -28,16 +28,16 @@
     return EXCLUDE_TITLE_PATTERNS.some((re) => re.test(title || ""));
   }
 
-  // Discard if the role wants MORE than 1 year of experience (delegates to the
-  // shared filter; falls back to a local copy if it isn't injected).
+  // Discard only if the role's LOWER bound is already above 1 year (delegates
+  // to the shared filter; falls back to a local copy if it isn't injected).
   function tooMuchExperience(expText) {
     if (window.__jhJobFilter) return window.__jhJobFilter.tooMuchExperience(expText);
     if (!expText) return false;
     const lower = expText.toLowerCase();
     const nums = (lower.match(/\d+/g) || []).map(Number);
     if (nums.length === 0) return false;
-    const maxYear = Math.max(...nums);
-    return maxYear > 1 || (/\d+\s*\+/.test(lower) && maxYear >= 1);
+    const minYear = Math.min(...nums);
+    return minYear > 1;
   }
 
   const seenUrls = new Set();

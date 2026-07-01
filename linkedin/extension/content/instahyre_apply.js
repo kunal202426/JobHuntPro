@@ -51,8 +51,8 @@
     const lower = expText.toLowerCase();
     const nums = (lower.match(/\d+/g) || []).map(Number);
     if (nums.length === 0) return false;
-    const maxYear = Math.max(...nums);
-    return maxYear > 1 || (/\d+\s*\+/.test(lower) && maxYear >= 1);
+    const minYear = Math.min(...nums);
+    return minYear > 1;
   }
 
   // --- Search-form automation (mirrors instahyre.js's scraper) --------------

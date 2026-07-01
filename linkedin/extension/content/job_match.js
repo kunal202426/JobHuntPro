@@ -28,16 +28,18 @@ window.__jhJobFilter = (function () {
     return EXCLUDE_TITLE.some((re) => re.test(title || ""));
   }
 
-  // Drop if the role wants MORE than 1 year (e.g. "1-4 Years" → max 4 → drop).
-  // Only 0-1 YOE roles pass — matches the candidate's actual experience level.
+  // Drop only if the role's LOWER bound is already above what a 0-1 YOE
+  // candidate has (e.g. "2-4 years", "3+ years"). Real postings almost always
+  // list a wide range even when open to freshers ("0-3 years", "1-2 years") —
+  // checking the max would reject nearly everything, since the ceiling of a
+  // range says nothing about whether the floor still includes 0-1 YOE.
   function tooMuchExperience(expText) {
     if (!expText) return false;
     const lower = String(expText).toLowerCase();
     const nums = (lower.match(/\d+/g) || []).map(Number);
     if (nums.length === 0) return false;
-    const maxYear = Math.max(...nums);
-    const hasPlus = /\d+\s*\+/.test(lower);
-    return maxYear > 1 || (hasPlus && maxYear >= 1);
+    const minYear = Math.min(...nums);
+    return minYear > 1;
   }
 
   // Robust relative-time parser. Handles seconds…years and "N+ unit" forms.
