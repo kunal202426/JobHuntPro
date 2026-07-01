@@ -350,6 +350,14 @@
   const JOB_FUNCTION_VALUES = ["/api/v1/job_category/1", "/api/v1/job_category/8"];
   const TARGET_YEARS = "0";
 
+  // "Software Engineering" (job_category/1) has no clickable "All -" .option row
+  // of its own in the dropdown — unlike every other group (Data Science, IT Ops,
+  // etc.), which DO render a normal "All - X" option. For Software Engineering,
+  // selecting the whole category only works by clicking its .optgroup-header.
+  const CATEGORY_HEADER_FALLBACK = {
+    "/api/v1/job_category/1": "Software Engineering",
+  };
+
   function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
 
   function isJobFunctionSelected(value) {
@@ -357,30 +365,42 @@
       .some((el) => el.getAttribute("data-value") === value);
   }
 
-  async function selectJobFunction(value) {
-    if (isJobFunctionSelected(value)) return true;
-
+  async function openJobFunctionsDropdown() {
     const input = document.getElementById("job-functions-selectized");
-    if (!input) return false;
+    if (!input) return null;
 
     input.focus();
     input.click();
 
-    let dropdown = null;
     for (let i = 0; i < 10; i++) {
-      dropdown = document.querySelector(".selectize-dropdown.multi");
-      if (dropdown && dropdown.style.display !== "none") break;
+      const dropdown = document.querySelector(".selectize-dropdown.multi");
+      if (dropdown && dropdown.style.display !== "none") return dropdown;
       await sleep(200);
-      dropdown = null;
     }
+    return null;
+  }
+
+  async function selectJobFunction(value) {
+    if (isJobFunctionSelected(value)) return true;
+
+    const dropdown = await openJobFunctionsDropdown();
     if (!dropdown) return false;
 
-    const option = Array.from(dropdown.querySelectorAll(".option"))
+    let target = Array.from(dropdown.querySelectorAll(".option"))
       .find((o) => o.getAttribute("data-value") === value);
-    if (!option) return false;
 
-    option.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
-    option.click();
+    // Fall back to clicking the optgroup header for categories with no direct
+    // "All -" option row (e.g. Software Engineering).
+    if (!target && CATEGORY_HEADER_FALLBACK[value]) {
+      const label = CATEGORY_HEADER_FALLBACK[value];
+      target = Array.from(dropdown.querySelectorAll(".optgroup-header"))
+        .find((h) => cleanText(h.textContent) === label);
+    }
+
+    if (!target) return false;
+
+    target.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+    target.click();
     await sleep(300);
     return isJobFunctionSelected(value);
   }
