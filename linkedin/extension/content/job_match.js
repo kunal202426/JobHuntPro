@@ -28,7 +28,8 @@ window.__jhJobFilter = (function () {
     return EXCLUDE_TITLE.some((re) => re.test(title || ""));
   }
 
-  // Drop if the role wants MORE than 2 years (e.g. "1-4 Years" → max 4 → drop).
+  // Drop if the role wants MORE than 1 year (e.g. "1-4 Years" → max 4 → drop).
+  // Only 0-1 YOE roles pass — matches the candidate's actual experience level.
   function tooMuchExperience(expText) {
     if (!expText) return false;
     const lower = String(expText).toLowerCase();
@@ -36,7 +37,7 @@ window.__jhJobFilter = (function () {
     if (nums.length === 0) return false;
     const maxYear = Math.max(...nums);
     const hasPlus = /\d+\s*\+/.test(lower);
-    return maxYear > 2 || (hasPlus && maxYear >= 2);
+    return maxYear > 1 || (hasPlus && maxYear >= 1);
   }
 
   // Robust relative-time parser. Handles seconds…years and "N+ unit" forms.

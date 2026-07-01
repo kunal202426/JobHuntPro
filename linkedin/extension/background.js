@@ -25,8 +25,10 @@ const SCRAPE_SOURCES = {
     injectFile: "content/cutshort.js",
   },
   instahyre: {
-    // Instahyre's city landing pages render job cards directly; /search/ no longer does for this flow.
-    url: "https://www.instahyre.com/jobs-in-delhi-ncr/",
+    // Instahyre's own recommendation feed, filtered server-side: company_size=0 (all),
+    // job_functions = Software Engineering / Backend / Full-Stack, job_type=0 (all),
+    // years=0 → recommends fresher/0-1 YOE roles instead of the generic city listing.
+    url: "https://www.instahyre.com/candidate/opportunities/?company_size=0&job_functions=%2Fapi%2Fv1%2Fjob_category%2F1,%2Fapi%2Fv1%2Fjob_function%2F10,%2Fapi%2Fv1%2Fjob_function%2F1&job_type=0&search=true&years=0",
     hostPrefix: "https://www.instahyre.com/",
     injectFile: "content/instahyre.js",
   },

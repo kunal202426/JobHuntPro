@@ -54,14 +54,14 @@
     return normalize((el && el.textContent) || document.title);
   }
 
-  // Drop if it wants more than 2 years, or is a senior title.
+  // Drop if it wants more than 1 year, or is a senior title.
   function unsuitableReason() {
     const exp = getExperienceText();
     if (exp) {
       const nums = (exp.toLowerCase().match(/\d+/g) || []).map(Number);
       if (nums.length) {
         const maxY = Math.max(...nums);
-        if (maxY > 2 || (/\d+\s*\+/.test(exp) && maxY >= 2)) return "too_experienced:" + exp;
+        if (maxY > 1 || (/\d+\s*\+/.test(exp) && maxY >= 1)) return "too_experienced:" + exp;
       }
     }
     const title = getJobTitle().toLowerCase();

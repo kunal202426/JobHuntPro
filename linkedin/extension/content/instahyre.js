@@ -28,7 +28,7 @@
     return EXCLUDE_TITLE_PATTERNS.some((re) => re.test(title || ""));
   }
 
-  // Discard if the role wants MORE than 2 years of experience (delegates to the
+  // Discard if the role wants MORE than 1 year of experience (delegates to the
   // shared filter; falls back to a local copy if it isn't injected).
   function tooMuchExperience(expText) {
     if (window.__jhJobFilter) return window.__jhJobFilter.tooMuchExperience(expText);
@@ -37,7 +37,7 @@
     const nums = (lower.match(/\d+/g) || []).map(Number);
     if (nums.length === 0) return false;
     const maxYear = Math.max(...nums);
-    return maxYear > 2 || (/\d+\s*\+/.test(lower) && maxYear >= 2);
+    return maxYear > 1 || (/\d+\s*\+/.test(lower) && maxYear >= 1);
   }
 
   const seenUrls = new Set();
@@ -102,6 +102,17 @@
     return { company, title };
   }
 
+  // On /candidate/opportunities/, cards have no href — the "View" trigger is an
+  // ng-click that opens an in-page modal. The only stable per-job identifier on
+  // the card itself is the numeric id embedded in the skills list's DOM id
+  // (e.g. id="job-skills-431345").
+  function extractJobId(card) {
+    const skillsList = card.querySelector('ul[id^="job-skills-"]');
+    if (!skillsList) return null;
+    const m = skillsList.id.match(/job-skills-(\d+)/);
+    return m ? m[1] : null;
+  }
+
   function extractJobCard(card) {
     try {
       let jobUrl =
@@ -114,9 +125,14 @@
         const parentLink = card.closest("a[href]");
         jobUrl = parentLink?.href;
       }
+
+      const jobId = extractJobId(card);
+      if (!jobUrl && jobId) {
+        jobUrl = `https://www.instahyre.com/candidate/opportunities/?jid=${jobId}`;
+      }
       if (!jobUrl) return null;
       if (!jobUrl.startsWith("http")) jobUrl = "https://www.instahyre.com" + jobUrl;
-      jobUrl = jobUrl.split("?")[0];
+      if (!jobId) jobUrl = jobUrl.split("?")[0];
 
       const { company, title } = getCompanyAndTitle(card);
       if (!title || !company || !isRelevant(title)) return null;
@@ -225,6 +241,152 @@
     debounceTimer = setTimeout(sendPendingJobs, 1500);
   }
 
+  // --- View → Apply automation ---------------------------------------------
+  // The opportunities feed has no per-job page: clicking a card's "View" area
+  // opens an Angular modal (ng-click="openApplyModal(opp)"). Experience isn't
+  // shown on the list card — only inside the modal — so the seniority/YOE gate
+  // runs there. Runs one card at a time via a queue to avoid overlapping modals.
+  const APPLIED_TEXT_RE = /you have applied|application sent|applied on|already applied|view application|you applied/i;
+  const applyQueue = [];
+  let applyQueueRunning = false;
+
+  function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
+
+  function isVisible(el) {
+    if (!el) return false;
+    try {
+      const s = getComputedStyle(el);
+      if (s.display === "none" || s.visibility === "hidden" || s.opacity === "0") return false;
+      return el.getClientRects().length > 0;
+    } catch { return true; }
+  }
+
+  function findViewTrigger(card) {
+    return card.querySelector("a.text-link") || card.querySelector("#interested-btn");
+  }
+
+  function findModalRoot() {
+    return document.querySelector(".candidate-apply-modal");
+  }
+
+  function findApplyButtonInModal(root) {
+    const candidates = Array.from((root || document).querySelectorAll("button, a.btn, .btn"));
+    for (const b of candidates) {
+      if (!isVisible(b)) continue;
+      const txt = cleanText(b.textContent).toLowerCase();
+      if (txt !== "apply" && txt !== "apply now") continue;
+      if (b.disabled || b.getAttribute("disabled") !== null) continue;
+      return b;
+    }
+    return null;
+  }
+
+  function findModalCloseControl(root) {
+    if (!root) return null;
+    return (
+      root.querySelector(".application-modal-close") ||
+      root.querySelector('[ng-click*="close"]') ||
+      root.querySelector(".application-modal-backdrop")
+    );
+  }
+
+  function getModalExperienceText(root) {
+    if (!root) return "";
+    const direct = root.querySelector('.experience, span.experience, [class*="experience"]');
+    if (direct) return cleanText(direct.textContent);
+    const brief = root.querySelector("i.fa-briefcase, .fa-briefcase");
+    if (brief && brief.parentElement) return cleanText(brief.parentElement.textContent);
+    const cand = Array.from(root.querySelectorAll("span, div, li")).find((e) => {
+      const t = (e.textContent || "").trim();
+      return t.length < 30 && /\byears?\b/i.test(t) && /\d/.test(t);
+    });
+    return cand ? cleanText(cand.textContent) : "";
+  }
+
+  function closeModal() {
+    const root = findModalRoot();
+    const close = findModalCloseControl(root);
+    if (close) { close.click(); return; }
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+  }
+
+  async function tryApplyOnCard(card, jobMeta) {
+    const trigger = findViewTrigger(card);
+    if (!trigger) return;
+
+    trigger.click();
+
+    let root = null;
+    for (let i = 0; i < 16; i++) {
+      root = findModalRoot();
+      if (root && root.querySelector("button, a.btn, .btn") && cleanText(root.textContent).length > 20) break;
+      await sleep(400);
+    }
+    if (!root) {
+      console.log(`[Instahyre] Apply modal didn't open for ${jobMeta.title}`);
+      return;
+    }
+
+    await sleep(400); // let Angular finish rendering job details
+
+    if (APPLIED_TEXT_RE.test(cleanText(root.textContent))) {
+      console.log(`[Instahyre] Already applied: ${jobMeta.title} @ ${jobMeta.company}`);
+      closeModal();
+      return;
+    }
+
+    const exp = getModalExperienceText(root);
+    if (tooMuchExperience(exp)) {
+      console.log(`[Instahyre] Skipping (too experienced, ${exp}): ${jobMeta.title} @ ${jobMeta.company}`);
+      closeModal();
+      return;
+    }
+
+    const applyBtn = findApplyButtonInModal(root);
+    if (!applyBtn) {
+      console.log(`[Instahyre] No Apply button found for ${jobMeta.title}`);
+      closeModal();
+      return;
+    }
+
+    applyBtn.click();
+
+    for (let i = 0; i < 14; i++) {
+      await sleep(500);
+      const stillRoot = findModalRoot();
+      if (!stillRoot || APPLIED_TEXT_RE.test(cleanText(stillRoot.textContent)) || !findApplyButtonInModal(stillRoot)) {
+        console.log(`[Instahyre] Applied: ${jobMeta.title} @ ${jobMeta.company}`);
+        break;
+      }
+    }
+
+    closeModal();
+    await sleep(600);
+  }
+
+  function enqueueForApply(card, jobMeta) {
+    applyQueue.push({ card, jobMeta });
+    runApplyQueue();
+  }
+
+  async function runApplyQueue() {
+    if (applyQueueRunning) return;
+    applyQueueRunning = true;
+    try {
+      while (applyQueue.length > 0) {
+        const { card, jobMeta } = applyQueue.shift();
+        try {
+          await tryApplyOnCard(card, jobMeta);
+        } catch (err) {
+          console.warn("[Instahyre] Apply flow error:", err.message);
+          closeModal();
+        }
+      }
+    } finally {
+      applyQueueRunning = false;
+    }
+  }
+
   function tryAddCard(node) {
     const card = node.matches?.(".employer-block, .employer-row, a.text-link[href*='/job-']") ? node : node.closest?.(".employer-block, .employer-row");
     const target = card || node;
@@ -232,6 +394,7 @@
     if (!job || seenUrls.has(job.job_url)) return false;
     seenUrls.add(job.job_url);
     pendingJobs.push(job);
+    enqueueForApply(target, job);
     return true;
   }
 
