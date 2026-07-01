@@ -120,12 +120,21 @@ router.post("/batch", async (req, res) => {
   await withTransaction(async (client) => {
     for (const job of newJobs) {
       const s = scoredMap[job.temp_id];
-      if (s && s.score !== null && s.score < threshold) { rejected++; continue; }
+      // A job the extension already auto-applied to (e.g. Instahyre's merged
+      // scrape+apply flow) is a real, already-submitted application — it must
+      // be recorded regardless of score, or we'd lose all visibility into what
+      // was actually applied to.
+      const isAlreadyApplied = job.status === "applied";
+      if (!isAlreadyApplied && s && s.score !== null && s.score < threshold) { rejected++; continue; }
+
+      const initialStatus = isAlreadyApplied ? "applied" : "unseen";
+      const appliedAt = isAlreadyApplied ? new Date().toISOString() : null;
+
       await client.query(
         `INSERT INTO jobs
           (id, user_id, title, company, location, source, job_url, posted_at, posted_at_parsed,
-           experience_required, skills, salary, is_startup, ai_score, ai_reason, status)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,'unseen')
+           experience_required, skills, salary, is_startup, ai_score, ai_reason, status, applied_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
          ON CONFLICT DO NOTHING`,
         [
           uuidv4(), uid,
@@ -134,6 +143,7 @@ router.post("/batch", async (req, res) => {
           job.posted_at_parsed || null, job.experience_required || null,
           job.skills?.length ? JSON.stringify(job.skills) : null, job.salary || null,
           job.is_startup ? 1 : 0, s?.score ?? null, s?.reason ?? null,
+          initialStatus, appliedAt,
         ]
       );
       saved++;

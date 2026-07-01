@@ -241,13 +241,171 @@
     debounceTimer = setTimeout(sendPendingJobs, 1500);
   }
 
+  // --- Merged apply: since there's no standalone job page, the only way to
+  // apply is to click a card's "View" while it's still rendered on the feed —
+  // exactly where we already are during scraping. Doing this as a separate
+  // pass afterward meant reopening the feed, re-finding each card by id, and
+  // running its own scroll/page loop — slower and less reliable than just
+  // applying inline, one card at a time, the moment we find it here.
+  const APPLIED_TEXT_RE = /you have applied|application sent|applied on|already applied|view application|you applied/i;
+
+  function isVisible(el) {
+    if (!el) return false;
+    try {
+      const s = getComputedStyle(el);
+      if (s.display === "none" || s.visibility === "hidden" || s.opacity === "0") return false;
+      return el.getClientRects().length > 0;
+    } catch { return true; }
+  }
+
+  function alreadyAppliedText(root) {
+    return APPLIED_TEXT_RE.test(cleanText((root || document.body).innerText));
+  }
+
+  function findApplyButtonInModal(root) {
+    const candidates = Array.from((root || document).querySelectorAll("button, a.btn, .btn"));
+    for (const b of candidates) {
+      if (!isVisible(b)) continue;
+      const txt = cleanText(b.textContent).toLowerCase();
+      if (txt !== "apply" && txt !== "apply now") continue;
+      if (b.disabled || b.getAttribute("disabled") !== null) continue;
+      return b;
+    }
+    return null;
+  }
+
+  function getModalExperienceText(root) {
+    if (!root) return "";
+    const direct = root.querySelector('.experience, span.experience, [class*="experience"]');
+    return direct ? cleanText(direct.textContent) : "";
+  }
+
+  function findModalRoot() {
+    return document.querySelector(".candidate-apply-modal");
+  }
+
+  function findModalCloseControl(root) {
+    if (!root) return null;
+    return (
+      root.querySelector(".application-modal-close") ||
+      root.querySelector('[ng-click*="close"]') ||
+      root.querySelector(".application-modal-backdrop")
+    );
+  }
+
+  function closeModal() {
+    const root = findModalRoot();
+    const close = findModalCloseControl(root);
+    if (close) { close.click(); return; }
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+  }
+
+  function findViewTrigger(card) {
+    return card.querySelector("a.text-link") || card.querySelector("#interested-btn");
+  }
+
+  async function attemptApply(card) {
+    const trigger = findViewTrigger(card);
+    if (!trigger) return { status: "failed", error: "view_trigger_not_found" };
+
+    trigger.click();
+
+    let root = null;
+    for (let i = 0; i < 16; i++) {
+      root = findModalRoot();
+      if (root && root.querySelector("button, a.btn, .btn") && cleanText(root.textContent).length > 20) break;
+      await sleep(400);
+      root = null;
+    }
+    if (!root) return { status: "failed", error: "apply_modal_did_not_open" };
+
+    await sleep(400); // let Angular finish rendering job details
+
+    if (alreadyAppliedText(root)) {
+      closeModal();
+      return { status: "already_applied" };
+    }
+
+    const exp = getModalExperienceText(root);
+    if (tooMuchExperience(exp)) {
+      closeModal();
+      return { status: "discarded", error: "too_experienced:" + exp };
+    }
+
+    const btn = findApplyButtonInModal(root);
+    if (!btn) {
+      closeModal();
+      return { status: "failed", error: "apply_button_not_found" };
+    }
+
+    btn.click();
+
+    let result = { status: "failed", error: "apply_unconfirmed" };
+    for (let i = 0; i < 20; i++) {
+      await sleep(500);
+      const stillRoot = findModalRoot();
+      if (!stillRoot || alreadyAppliedText(stillRoot) || !findApplyButtonInModal(stillRoot)) {
+        result = { status: "applied" };
+        break;
+      }
+    }
+
+    closeModal();
+    return result;
+  }
+
+  const applyQueue = [];
+  let applyQueueRunning = false;
+
+  function enqueueForApply(card, job) {
+    applyQueue.push({ card, job });
+    runApplyQueue();
+  }
+
+  async function runApplyQueue() {
+    if (applyQueueRunning) return;
+    applyQueueRunning = true;
+    try {
+      while (applyQueue.length > 0) {
+        const { card, job } = applyQueue.shift();
+        try {
+          const outcome = await attemptApply(card);
+          if (outcome.status === "applied" || outcome.status === "already_applied") {
+            job.status = "applied";
+            pendingJobs.push(job);
+            debouncedSend();
+            console.log(`[Instahyre] Applied: ${job.title} @ ${job.company}`);
+          } else if (outcome.status === "discarded") {
+            console.log(`[Instahyre] Skipped (too experienced, ${outcome.error}): ${job.title} @ ${job.company}`);
+            // Not saved — matches the old separate-apply flow's discard behavior.
+          } else {
+            // Apply failed for a technical reason (button missing, timeout,
+            // modal never opened) — still save it as a normal unseen job so
+            // it isn't lost; it can be retried later via IH Apply.
+            console.warn(`[Instahyre] Apply failed (${outcome.error}) — saved as unseen: ${job.title} @ ${job.company}`);
+            pendingJobs.push(job);
+            debouncedSend();
+          }
+        } catch (err) {
+          console.warn("[Instahyre] Apply queue error:", err.message);
+          closeModal();
+          pendingJobs.push(job);
+          debouncedSend();
+        }
+        await sleep(600);
+      }
+    } finally {
+      applyQueueRunning = false;
+    }
+  }
+
   function tryAddCard(node) {
     const card = node.matches?.(".employer-block, .employer-row, a.text-link[href*='/job-']") ? node : node.closest?.(".employer-block, .employer-row");
     const target = card || node;
     const job = extractJobCard(target);
     if (!job || seenUrls.has(job.job_url)) return false;
     seenUrls.add(job.job_url);
-    pendingJobs.push(job);
+    enqueueForApply(target, job);
     return true;
   }
 
