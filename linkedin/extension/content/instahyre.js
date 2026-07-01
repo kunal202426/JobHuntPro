@@ -28,17 +28,6 @@
     return EXCLUDE_TITLE_PATTERNS.some((re) => re.test(title || ""));
   }
 
-  // Discard only if the role's LOWER bound is already above 1 year (delegates
-  // to the shared filter; falls back to a local copy if it isn't injected).
-  function tooMuchExperience(expText) {
-    if (window.__jhJobFilter) return window.__jhJobFilter.tooMuchExperience(expText);
-    if (!expText) return false;
-    const lower = expText.toLowerCase();
-    const nums = (lower.match(/\d+/g) || []).map(Number);
-    if (nums.length === 0) return false;
-    const minYear = Math.min(...nums);
-    return minYear > 1;
-  }
 
   const seenUrls = new Set();
   const pendingJobs = [];
@@ -161,8 +150,8 @@
         card.querySelector("[class*='exp']") ||
         card.querySelector("[class*='yrs']");
       const experience_required = cleanText(expEl?.textContent) || null;
-      // Skip roles requiring more than 2 years of experience.
-      if (tooMuchExperience(experience_required)) return null;
+      // Trust Instahyre's own search filter (years=0) instead of re-parsing
+      // this text ourselves — don't reject based on it.
 
       const salaryEl =
         card.querySelector("[class*='salary']") ||
@@ -274,12 +263,6 @@
     return null;
   }
 
-  function getModalExperienceText(root) {
-    if (!root) return "";
-    const direct = root.querySelector('.experience, span.experience, [class*="experience"]');
-    return direct ? cleanText(direct.textContent) : "";
-  }
-
   function findModalRoot() {
     return document.querySelector(".candidate-apply-modal");
   }
@@ -326,12 +309,9 @@
       return { status: "already_applied" };
     }
 
-    const exp = getModalExperienceText(root);
-    if (tooMuchExperience(exp)) {
-      closeModal();
-      return { status: "discarded", error: "too_experienced:" + exp };
-    }
-
+    // Trust Instahyre's own search filter (years=0 + job functions) instead of
+    // re-parsing the experience text ourselves — that was rejecting jobs it
+    // shouldn't have (see job_match.js history for why).
     const btn = findApplyButtonInModal(root);
     if (!btn) {
       closeModal();

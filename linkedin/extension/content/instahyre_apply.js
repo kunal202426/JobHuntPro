@@ -38,23 +38,6 @@
     return null;
   }
 
-  function getExperienceText(root) {
-    const scope = root || document;
-    const direct = scope.querySelector('.experience, span.experience, [class*="experience"]');
-    return direct ? cleanText(direct.textContent) : "";
-  }
-
-  // Drop if it wants more than 1 year of experience.
-  function tooMuchExperience(expText) {
-    if (window.__jhJobFilter) return window.__jhJobFilter.tooMuchExperience(expText);
-    if (!expText) return false;
-    const lower = expText.toLowerCase();
-    const nums = (lower.match(/\d+/g) || []).map(Number);
-    if (nums.length === 0) return false;
-    const minYear = Math.min(...nums);
-    return minYear > 1;
-  }
-
   // --- Search-form automation (mirrors instahyre.js's scraper) --------------
   const JOB_FUNCTION_VALUES = ["/api/v1/job_category/1", "/api/v1/job_category/8"];
   const TARGET_YEARS = "0";
@@ -233,12 +216,8 @@
       return { status: "already_applied" };
     }
 
-    const exp = getExperienceText(root);
-    if (tooMuchExperience(exp)) {
-      closeModal();
-      return { status: "discarded", error: "too_experienced:" + exp };
-    }
-
+    // Trust Instahyre's own search filter (years=0 + job functions) instead
+    // of re-parsing experience text ourselves.
     const btn = findApplyButton(root);
     if (!btn) {
       closeModal();
