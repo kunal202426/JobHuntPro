@@ -325,23 +325,62 @@ async function runConnectLoop() {
 }
 
 // ── Instahyre auto-apply ─────────────────────────────────────────────────────
+// Instahyre has no standalone per-job page anymore (see instahyre_apply.js) —
+// a job can only be reached by finding its card on the (filtered) recommendation
+// feed. So instead of navigating once per queued job, we drain the WHOLE pending
+// queue up front, open the feed ONCE, and let the content script page/scroll
+// through it in a single continuous pass, applying to every card that matches
+// a pending job_id. Each result is still reported through the same
+// /api/apply/result endpoint, so the existing pending/processing/done/failed
+// counts (and the dashboard's "X left" indicator) keep working unchanged.
 let _applyLoopRunning = false;
 
-async function processOneApply() {
+async function collectPendingInstahyreTasks() {
+  const tasks = [];
+  while (true) {
+    const res = await fetchFromBackend("/api/apply/next");
+    if (!res || !res.ok) break;
+    const task = await res.json().catch(() => null);
+    if (!task || !task.job_url) break;
+    tasks.push(task);
+  }
+  return tasks;
+}
+
+async function processInstahyreApplyBatch() {
   if (!(await hasActiveSession())) return "stopped";
 
-  const res = await fetchFromBackend("/api/apply/next");
-  if (!res || !res.ok) return "no_item";
-  const task = await res.json().catch(() => null);
-  if (!task || !task.job_url) return "no_item";
+  const tasks = await collectPendingInstahyreTasks();
+  if (tasks.length === 0) return "no_item";
+
+  const jobs = tasks
+    .map((t) => {
+      const m = (t.job_url || "").match(/[?&]jid=(\d+)/);
+      return { id: t.id, job_id: t.job_id, jid: m ? m[1] : null };
+    })
+    .filter((t) => t.jid);
+
+  const missingJid = tasks.length - jobs.length;
+  if (missingJid > 0) {
+    console.warn(`[bg] ${missingJid} apply task(s) have no jid in job_url — marking failed`);
+    for (const t of tasks) {
+      if (!jobs.find((j) => j.id === t.id)) {
+        await postToBackend("/api/apply/result", {
+          id: t.id, job_id: t.job_id, status: "failed", error_msg: "no_jid_in_job_url",
+        }).catch(() => {});
+      }
+    }
+  }
+  if (jobs.length === 0) return "done";
 
   let targetTab;
+  const feedUrl = "https://www.instahyre.com/candidate/opportunities/";
   const tabs = await chrome.tabs.query({ url: "https://www.instahyre.com/*", active: false });
   if (tabs.length > 0) {
     targetTab = tabs[0];
-    await chrome.tabs.update(targetTab.id, { url: task.job_url });
+    await chrome.tabs.update(targetTab.id, { url: feedUrl });
   } else {
-    targetTab = await chrome.tabs.create({ url: task.job_url, active: false });
+    targetTab = await chrome.tabs.create({ url: feedUrl, active: false });
   }
 
   await waitForTabLoad(targetTab.id);
@@ -349,34 +388,39 @@ async function processOneApply() {
 
   if (!(await hasActiveSession())) return "stopped";
 
+  let results = [];
   try {
     const response = await sendMessageToTabWithInjection(targetTab.id, {
-      type: "DO_APPLY",
-      payload: { job_id: task.job_id },
+      type: "DO_APPLY_BATCH",
+      payload: { jobs },
     }, "content/instahyre_apply.js");
-
-    const status = response?.status || "failed";
-    console.log(`[bg] DO_APPLY result: ${status}`, response?.error || "");
-    await postToBackend("/api/apply/result", {
-      id: task.id, job_id: task.job_id, status, error_msg: response?.error || null,
-    }).catch(() => {});
+    results = response?.results || [];
   } catch (err) {
-    console.error("[bg] DO_APPLY error:", err?.message || err);
+    console.error("[bg] DO_APPLY_BATCH error:", err?.message || err);
+  }
+
+  for (const r of results) {
     await postToBackend("/api/apply/result", {
-      id: task.id, job_id: task.job_id, status: "failed", error_msg: err?.message || "apply_error",
+      id: r.id, job_id: r.job_id, status: r.status || "failed", error_msg: r.error || null,
     }).catch(() => {});
+  }
+
+  // Anything never found on the feed at all (removed/expired since scraping) —
+  // clear it out so the queue doesn't stay stuck "processing" forever.
+  const reportedIds = new Set(results.map((r) => r.id));
+  for (const j of jobs) {
+    if (!reportedIds.has(j.id)) {
+      await postToBackend("/api/apply/result", {
+        id: j.id, job_id: j.job_id, status: "failed", error_msg: "job_not_found_on_feed",
+      }).catch(() => {});
+    }
   }
 
   return "done";
 }
 
-// Process the apply queue with a short 1s gap between each.
 async function runApplyLoop() {
-  while (true) {
-    const result = await processOneApply();
-    if (result !== "done") break;
-    await keepAliveDelay(1000);
-  }
+  await processInstahyreApplyBatch();
 }
 
 function keepAliveDelay(ms) {

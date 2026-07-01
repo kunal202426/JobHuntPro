@@ -1,16 +1,16 @@
-// content/instahyre_apply.js — runs ONLY when the user clicks "IH Apply" (the
-// bulk apply queue), never during scraping. Two page shapes are supported:
+// content/instahyre_apply.js — "IH Apply" bulk-apply.
 //
-// 1. Old-style standalone job page: the whole document IS the job — the Apply
-//    button is somewhere on the page.
-// 2. New recommendation feed (/candidate/opportunities/?jid=<id>): the job has
-//    no standalone page. We land on the general feed, find the card whose
-//    skills-list DOM id matches ?jid=, click its "View" area to open Instahyre's
-//    in-page Angular modal (ng-click="openApplyModal(opp)"), then act inside it.
-//    Job functions/experience only show inside that modal, not on the card.
+// Instahyre has no standalone per-job page anymore: a job can only be reached
+// by finding its card on the recommendation feed and clicking it to open an
+// in-page Angular modal (ng-click="openApplyModal(opp)"). So there is no way
+// to process the apply queue one job at a time with separate navigations —
+// instead we open the (filtered) feed ONCE and page/scroll through it in a
+// single continuous pass, applying to every card whose job-skills id matches
+// something in the pending queue (sent in as `jobs`, keyed by numeric jid).
 
 (() => {
   function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
+  function cleanText(v) { return (v || "").replace(/\s+/g, " ").trim(); }
 
   function visible(el) {
     if (!el) return false;
@@ -21,97 +21,166 @@
     } catch (e) { return true; }
   }
 
-  function normalize(t) { return (t || "").replace(/\s+/g, " ").trim().toLowerCase(); }
-
-  const APPLIED_TEXT_RE = /you have applied|application sent|applied on|already applied|view application|you applied/;
-
+  const APPLIED_TEXT_RE = /you have applied|application sent|applied on|already applied|view application|you applied/i;
   function alreadyApplied(root) {
-    const text = normalize((root || document.body)?.innerText);
-    return APPLIED_TEXT_RE.test(text);
+    return APPLIED_TEXT_RE.test(cleanText((root || document.body).innerText));
   }
 
-  // The primary "Apply" button (not "Apply with..." variations, not disabled).
   function findApplyButton(root) {
     const candidates = Array.from((root || document).querySelectorAll("button, a.btn, .btn"));
     for (const b of candidates) {
       if (!visible(b)) continue;
-      const txt = normalize(b.textContent);
+      const txt = cleanText(b.textContent).toLowerCase();
       if (txt !== "apply" && txt !== "apply now") continue;
       if (b.disabled || b.getAttribute("disabled") !== null) continue;
-      if (b.getAttribute("ng-disabled") && /!jobdataloaded/i.test(b.getAttribute("ng-disabled")) && b.disabled) continue;
       return b;
     }
     return null;
   }
 
-  // Read the experience requirement (e.g. "0 - 3 years").
   function getExperienceText(root) {
     const scope = root || document;
     const direct = scope.querySelector('.experience, span.experience, [class*="experience"]');
-    if (direct) return normalize(direct.textContent);
-    const brief = scope.querySelector('i.fa-briefcase, .fa-briefcase');
-    if (brief && brief.parentElement) return normalize(brief.parentElement.textContent);
-    const cand = Array.from(scope.querySelectorAll("span, div, li")).find((e) => {
-      const t = (e.textContent || "").trim();
-      return t.length < 30 && /\byears?\b/i.test(t) && /\d/.test(t);
-    });
-    return cand ? normalize(cand.textContent) : "";
+    return direct ? cleanText(direct.textContent) : "";
   }
 
-  function getJobTitle(root) {
-    const scope = root || document;
-    const el = scope.querySelector('h1, .job-title, [class*="job-title"], [class*="jobTitle"]');
-    return normalize((el && el.textContent) || document.title);
+  // Drop if it wants more than 1 year of experience.
+  function tooMuchExperience(expText) {
+    if (window.__jhJobFilter) return window.__jhJobFilter.tooMuchExperience(expText);
+    if (!expText) return false;
+    const lower = expText.toLowerCase();
+    const nums = (lower.match(/\d+/g) || []).map(Number);
+    if (nums.length === 0) return false;
+    const maxYear = Math.max(...nums);
+    return maxYear > 1 || (/\d+\s*\+/.test(lower) && maxYear >= 1);
   }
 
-  // Drop if it wants more than 1 year, or is a senior title.
-  function unsuitableReason(root) {
-    const exp = getExperienceText(root);
-    if (exp) {
-      const nums = (exp.toLowerCase().match(/\d+/g) || []).map(Number);
-      if (nums.length) {
-        const maxY = Math.max(...nums);
-        if (maxY > 1 || (/\d+\s*\+/.test(exp) && maxY >= 1)) return "too_experienced:" + exp;
-      }
-    }
-    const title = getJobTitle(root).toLowerCase();
-    if (/\bsenior\b|\bsr\.?\b|\blead\b|\bprincipal\b|\bstaff\b|\barchitect\b|\bmanager\b|\biii\b|\biv\b|\bl[2-9]\b/.test(title)) {
-      return "senior_title:" + title;
+  // --- Search-form automation (mirrors instahyre.js's scraper) --------------
+  const JOB_FUNCTION_VALUES = ["/api/v1/job_category/1", "/api/v1/job_category/8"];
+  const TARGET_YEARS = "0";
+  const CATEGORY_HEADER_FALLBACK = { "/api/v1/job_category/1": "Software Engineering" };
+
+  function getJobFunctionsControl() {
+    const input = document.getElementById("job-functions-selectized");
+    return input ? input.closest(".selectize-control") : null;
+  }
+
+  function isJobFunctionSelected(value) {
+    const control = getJobFunctionsControl();
+    if (!control) return false;
+    return Array.from(control.querySelectorAll(".item"))
+      .some((el) => el.getAttribute("data-value") === value);
+  }
+
+  async function openJobFunctionsDropdown() {
+    const control = getJobFunctionsControl();
+    const input = document.getElementById("job-functions-selectized");
+    if (!control || !input) return null;
+
+    const inputWrap = control.querySelector(".selectize-input");
+    (inputWrap || input).dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+    input.focus();
+
+    for (let i = 0; i < 10; i++) {
+      const dropdown = control.querySelector(".selectize-dropdown");
+      if (dropdown && dropdown.style.display !== "none") return dropdown;
+      await sleep(200);
     }
     return null;
   }
 
-  // --- New recommendation-feed flow (modal-based) ---------------------------
+  async function selectJobFunction(value) {
+    if (isJobFunctionSelected(value)) return true;
 
-  function findCardByJobId(jobId) {
-    const skillsList = document.querySelector(`ul[id="job-skills-${jobId}"]`);
+    const dropdown = await openJobFunctionsDropdown();
+    if (!dropdown) return false;
+
+    let target = Array.from(dropdown.querySelectorAll(".option"))
+      .find((o) => o.getAttribute("data-value") === value);
+
+    if (!target && CATEGORY_HEADER_FALLBACK[value]) {
+      const label = CATEGORY_HEADER_FALLBACK[value];
+      target = Array.from(dropdown.querySelectorAll(".optgroup-header"))
+        .find((h) => cleanText(h.textContent) === label);
+    }
+
+    if (!target) return false;
+
+    target.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+    target.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+    target.click();
+    await sleep(400);
+    return isJobFunctionSelected(value);
+  }
+
+  function setYearsInput(years) {
+    const input = document.getElementById("years");
+    if (!input) return false;
+    const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
+    setter.call(input, years);
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+    return true;
+  }
+
+  async function applyInstahyreFilters() {
+    try {
+      let ready = false;
+      for (let i = 0; i < 20; i++) {
+        if (document.getElementById("job-functions-selectized") &&
+            document.getElementById("years") &&
+            document.getElementById("show-results")) {
+          ready = true;
+          break;
+        }
+        await sleep(300);
+      }
+      if (!ready) {
+        console.log("[Instahyre Apply] Search form not found — applying against the default recommended feed");
+        return false;
+      }
+
+      for (const value of JOB_FUNCTION_VALUES) await selectJobFunction(value);
+
+      const stillMissing = JOB_FUNCTION_VALUES.filter((v) => !isJobFunctionSelected(v));
+      if (stillMissing.length > 0) {
+        console.warn("[Instahyre Apply] Job functions did not stick:", stillMissing);
+        return false;
+      }
+
+      setYearsInput(TARGET_YEARS);
+      await sleep(300);
+
+      const showBtn = document.getElementById("show-results");
+      if (!showBtn || showBtn.disabled || showBtn.getAttribute("disabled") !== null) {
+        console.log("[Instahyre Apply] Show results button disabled");
+        return false;
+      }
+
+      showBtn.click();
+      console.log("[Instahyre Apply] Search filters applied");
+      await sleep(2500);
+      return true;
+    } catch (err) {
+      console.warn("[Instahyre Apply] applyInstahyreFilters error:", err.message);
+      return false;
+    }
+  }
+
+  // --- Card / modal helpers --------------------------------------------------
+  function getCardNodes() {
+    return Array.from(document.querySelectorAll(".employer-block, .employer-row"));
+  }
+
+  function extractJobId(card) {
+    const skillsList = card.querySelector('ul[id^="job-skills-"]');
     if (!skillsList) return null;
-    return skillsList.closest(".employer-block, .employer-row");
+    const m = skillsList.id.match(/job-skills-(\d+)/);
+    return m ? m[1] : null;
   }
 
   function findViewTrigger(card) {
     return card.querySelector("a.text-link") || card.querySelector("#interested-btn");
-  }
-
-  function clickNextPage() {
-    const candidates = Array.from(document.querySelectorAll(".pagination li, .pagination a, .pagination span"));
-    const next = candidates.find((el) => /next/i.test(normalize(el.textContent)) && !el.classList.contains("hidden"));
-    if (!next) return false;
-    next.click();
-    return true;
-  }
-
-  async function findCardWithPaging(jobId) {
-    let card = findCardByJobId(jobId);
-    if (card) return card;
-
-    for (let page = 0; page < 3 && !card; page++) {
-      const moved = clickNextPage();
-      if (!moved) break;
-      await sleep(1500);
-      card = findCardByJobId(jobId);
-    }
-    return card;
   }
 
   function findModalRoot() {
@@ -134,10 +203,15 @@
     document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
   }
 
-  async function doApplyViaModal(jobId) {
-    const card = await findCardWithPaging(jobId);
-    if (!card) return { status: "failed", error: "job_not_found_on_feed" };
+  function clickNextPage() {
+    const candidates = Array.from(document.querySelectorAll(".pagination li, .pagination a, .pagination span"));
+    const next = candidates.find((el) => /next/i.test(cleanText(el.textContent)) && !el.classList.contains("hidden"));
+    if (!next) return false;
+    next.click();
+    return true;
+  }
 
+  async function applyToCard(card) {
     const trigger = findViewTrigger(card);
     if (!trigger) return { status: "failed", error: "view_trigger_not_found" };
 
@@ -146,7 +220,7 @@
     let root = null;
     for (let i = 0; i < 16; i++) {
       root = findModalRoot();
-      if (root && root.querySelector("button, a.btn, .btn") && (root.textContent || "").trim().length > 20) break;
+      if (root && root.querySelector("button, a.btn, .btn") && cleanText(root.textContent).length > 20) break;
       await sleep(400);
       root = null;
     }
@@ -159,10 +233,10 @@
       return { status: "already_applied" };
     }
 
-    const reason = unsuitableReason(root);
-    if (reason) {
+    const exp = getExperienceText(root);
+    if (tooMuchExperience(exp)) {
       closeModal();
-      return { status: "discarded", error: reason };
+      return { status: "discarded", error: "too_experienced:" + exp };
     }
 
     const btn = findApplyButton(root);
@@ -187,45 +261,81 @@
     return result;
   }
 
-  // --- Old standalone-page flow (kept as a fallback) ------------------------
+  // jobs: [{ id, job_id, jid }] — id/job_id are our backend's identifiers
+  // (reported back per result), jid is Instahyre's numeric job id used to
+  // match against each card's job-skills-<jid> element.
+  async function runApplyBatch(jobs) {
+    const pending = new Map(jobs.filter((j) => j.jid).map((j) => [String(j.jid), j]));
+    const processedJids = new Set();
+    const results = [];
 
-  async function doApplyOnPage() {
-    let btn = null;
-    for (let i = 0; i < 24; i++) {
-      if (alreadyApplied()) return { status: "already_applied" };
-      btn = findApplyButton();
-      if (btn) break;
-      await sleep(500);
+    console.log(`[Instahyre Apply] Starting batch — ${pending.size} job(s) to look for`);
+    await applyInstahyreFilters();
+
+    let cycles = 0;
+    let idleCycles = 0;
+    let pageClicks = 0;
+    const MAX_CYCLES = 40;
+    const MAX_IDLE = 6;
+    const MAX_PAGES = 10;
+
+    while (pending.size > 0 && cycles < MAX_CYCLES && pageClicks < MAX_PAGES) {
+      cycles++;
+      let foundThisCycle = 0;
+
+      for (const card of getCardNodes()) {
+        if (pending.size === 0) break;
+        const jid = extractJobId(card);
+        if (!jid || processedJids.has(jid) || !pending.has(jid)) continue;
+
+        processedJids.add(jid);
+        const task = pending.get(jid);
+        pending.delete(jid);
+        foundThisCycle++;
+
+        try {
+          const outcome = await applyToCard(card);
+          console.log(`[Instahyre Apply] jid=${jid} ->`, outcome.status, outcome.error || "");
+          results.push({ id: task.id, job_id: task.job_id, ...outcome });
+        } catch (err) {
+          console.warn(`[Instahyre Apply] jid=${jid} error:`, err.message);
+          results.push({ id: task.id, job_id: task.job_id, status: "failed", error: err.message });
+          closeModal();
+        }
+
+        await sleep(600);
+      }
+
+      if (foundThisCycle > 0) idleCycles = 0; else idleCycles++;
+
+      if (pending.size === 0) break;
+
+      window.scrollBy({ top: 900, behavior: "smooth" });
+      await sleep(1500);
+
+      const atBottom = (window.scrollY + window.innerHeight) >= (document.documentElement.scrollHeight - 150);
+      if (idleCycles >= MAX_IDLE || atBottom) {
+        const moved = clickNextPage();
+        if (moved) {
+          pageClicks++;
+          idleCycles = 0;
+          await sleep(2200);
+        } else if (idleCycles >= MAX_IDLE) {
+          console.log("[Instahyre Apply] No more pages/cards — stopping");
+          break;
+        }
+      }
     }
 
-    const reason = unsuitableReason();
-    if (reason) return { status: "discarded", error: reason };
-
-    if (alreadyApplied()) return { status: "already_applied" };
-    if (!btn) return { status: "failed", error: "apply_button_not_found" };
-
-    btn.click();
-
-    for (let i = 0; i < 20; i++) {
-      await sleep(500);
-      if (alreadyApplied()) return { status: "applied" };
-      if (!findApplyButton()) return { status: "applied" };
-    }
-    return { status: "failed", error: "apply_unconfirmed" };
-  }
-
-  async function doApply() {
-    const jobId = new URLSearchParams(window.location.search).get("jid");
-    if (jobId) return doApplyViaModal(jobId);
-    return doApplyOnPage();
+    console.log(`[Instahyre Apply] Batch done — ${results.length} processed, ${pending.size} not found on feed`);
+    return results;
   }
 
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    if (message.type === "DO_APPLY") {
-      const job_id = message.payload?.job_id;
-      doApply()
-        .then((r) => sendResponse({ ...r, job_id }))
-        .catch((e) => sendResponse({ status: "failed", error: e.message, job_id }));
+    if (message.type === "DO_APPLY_BATCH") {
+      runApplyBatch(message.payload?.jobs || [])
+        .then((results) => sendResponse({ results }))
+        .catch((e) => sendResponse({ results: [], error: e.message }));
       return true; // async
     }
   });
