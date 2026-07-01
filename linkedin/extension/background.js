@@ -1,5 +1,32 @@
 // background.js — Service worker: message hub between content scripts and backend
 
+// Tabs the extension itself opened for background work (scraping, connecting,
+// applying), keyed by a purpose string (e.g. a source name or "linkedin_connect").
+// We ONLY ever reuse a tab through this map — never chrome.tabs.query() for
+// "any tab matching this host that isn't currently focused", because that
+// would just as happily grab a tab the USER opened to read a profile or
+// browse a job themselves (perfectly capable of being "not active" while they
+// look at a different tab) and hijack it out from under them.
+const _workerTabIds = {};
+
+async function getOrCreateWorkerTab(key, url) {
+  const existingId = _workerTabIds[key];
+  if (existingId != null) {
+    try {
+      const tab = await chrome.tabs.get(existingId);
+      if (tab) {
+        await chrome.tabs.update(existingId, { url });
+        return tab;
+      }
+    } catch {
+      // Tab was closed or no longer exists — fall through and create a new one.
+    }
+  }
+  const tab = await chrome.tabs.create({ url, active: false });
+  _workerTabIds[key] = tab.id;
+  return tab;
+}
+
 // MUST match the deployed LinkedIn API URL (and popup.js / manifest.json).
 const BACKEND = (typeof __BACKEND_URL__ !== "undefined") ? __BACKEND_URL__ : "https://jobhuntpro-linkedin-api.onrender.com";
 const DEFAULT_DAILY_LIMIT = 14; // Conservative daily cap inferred from the common ~100 invitations/week restriction.
@@ -246,14 +273,7 @@ async function processOneConnection() {
   const person = await res.json().catch(() => null);
   if (!person || !person.profile_url) return "no_item";
 
-  let targetTab;
-  const tabs = await chrome.tabs.query({ url: "https://www.linkedin.com/*", active: false });
-  if (tabs.length > 0) {
-    targetTab = tabs[0];
-    await chrome.tabs.update(targetTab.id, { url: person.profile_url });
-  } else {
-    targetTab = await chrome.tabs.create({ url: person.profile_url, active: false });
-  }
+  const targetTab = await getOrCreateWorkerTab("linkedin_connect", person.profile_url);
 
   await waitForTabLoad(targetTab.id);
   await new Promise(r => setTimeout(r, 1200));
@@ -365,14 +385,7 @@ async function runScrapeTask(task) {
   const companyUrl = companyQuery ? buildCompanySearchUrl(source, companyQuery) : null;
   const targetUrl = companyUrl || cfg.url;
 
-  let targetTab;
-  const tabs = await chrome.tabs.query({ url: `${cfg.hostPrefix}*`, active: false });
-  if (tabs.length > 0) {
-    targetTab = tabs[0];
-    await chrome.tabs.update(targetTab.id, { url: targetUrl, active: false });
-  } else {
-    targetTab = await chrome.tabs.create({ url: targetUrl, active: false });
-  }
+  const targetTab = await getOrCreateWorkerTab(`scrape_${source}`, targetUrl);
 
   await waitForTabLoad(targetTab.id);
   await new Promise(r => setTimeout(r, 1800));
