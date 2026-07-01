@@ -221,24 +221,54 @@ function labelMatchesProfile(label, profileName) {
   return !!pFirst && pFirst === wFirst;
 }
 
+const CONNECT_BUTTON_SELECTORS = [
+  // New LinkedIn UI: the Connect control is often a <div>/custom element with
+  // aria-label "Invite <name> to connect" and a componentkey attribute.
+  '[aria-label^="Invite"][aria-label*="to connect" i]',
+  '[componentkey][aria-label*="to connect" i]',
+  // Older UI variants
+  'button[aria-label*="Connect"]',
+  'button[aria-label*="Invite"][aria-label*="connect" i]',
+  'div[aria-label*="Invite"][aria-label*="connect" i]',
+  'div[aria-label*="Connect" i]',
+  '.pvs-profile-actions button[aria-label*="Connect"]',
+  '.pv-s-profile-actions button[aria-label*="Connect"]',
+  '[data-view-name="profile-top-card-cta"] button[aria-label*="Connect"]',
+  '.artdeco-button--2[aria-label*="Connect"]',
+];
+
+function firstValidConnectButton(scope) {
+  for (const sel of CONNECT_BUTTON_SELECTORS) {
+    let matches = [];
+    try { matches = Array.from(scope.querySelectorAll(sel)); } catch (e) { continue; }
+    for (const btn of matches) {
+      if (!btn || btn.disabled) continue;
+      const label = (btn.getAttribute("aria-label") || "").toLowerCase();
+      if (/message|follow|pending|withdraw|remove connection/i.test(label)) continue;
+      if (!isElementVisible(btn)) continue;
+      return btn;
+    }
+  }
+  return null;
+}
+
 function findDirectConnectButton() {
+  // Try INSIDE the top card first — anything found here is guaranteed to
+  // belong to the current profile, no name-matching guesswork needed. This
+  // is the safe path; "People also viewed" / "similar profiles" carousels
+  // live outside the top card entirely.
+  const top = getProfileTopCard();
+  if (top) {
+    const scoped = firstValidConnectButton(top);
+    if (scoped) return scoped;
+  }
+
+  // Fall back to a page-wide search only if the top card doesn't have its
+  // own Connect control (e.g. it's tucked in the "More" menu instead) —
+  // name-match against the current profile so we don't grab a carousel
+  // suggestion's button for a different person.
   const profileName = getCurrentProfileName();
-  const selectors = [
-    // New LinkedIn UI: the Connect control is often a <div>/custom element with
-    // aria-label "Invite <name> to connect" and a componentkey attribute.
-    '[aria-label^="Invite"][aria-label*="to connect" i]',
-    '[componentkey][aria-label*="to connect" i]',
-    // Older UI variants
-    'button[aria-label*="Connect"]',
-    'button[aria-label*="Invite"][aria-label*="connect" i]',
-    'div[aria-label*="Invite"][aria-label*="connect" i]',
-    'div[aria-label*="Connect" i]',
-    '.pvs-profile-actions button[aria-label*="Connect"]',
-    '.pv-s-profile-actions button[aria-label*="Connect"]',
-    '[data-view-name="profile-top-card-cta"] button[aria-label*="Connect"]',
-    '.artdeco-button--2[aria-label*="Connect"]',
-  ];
-  for (const sel of selectors) {
+  for (const sel of CONNECT_BUTTON_SELECTORS) {
     let matches = [];
     try { matches = Array.from(document.querySelectorAll(sel)); } catch (e) { continue; }
     for (const btn of matches) {
@@ -246,12 +276,12 @@ function findDirectConnectButton() {
       const label = (btn.getAttribute("aria-label") || "").toLowerCase();
       if (/message|follow|pending|withdraw|remove connection/i.test(label)) continue;
       if (!isElementVisible(btn)) continue;
-      // Don't grab a "People similar" card's Connect for a different person.
       if (!labelMatchesProfile(label, profileName)) continue;
       return btn;
     }
   }
-  // Fallback: search for visible text "Connect" inside the top card (some pages render as div/span)
+
+  // Last resort: visible text "Connect" inside the top card (some pages render as div/span).
   const byText = findConnectByText();
   if (byText) return byText;
   return null;
@@ -320,10 +350,27 @@ function hasPendingInviteIndicatorGlobal() {
 }
 
 // STRICT "we already invited this person" check. The only reliable signal is a
-// visible "Withdraw invitation" control near the top of the profile — that
-// exists ONLY for someone you personally invited. We do NOT use loose "Pending"
-// text, which can come from carousels / nav and caused false "Sent".
+// visible "Withdraw invitation" control that lives INSIDE the current profile's
+// own top card — not just "somewhere near the top of the viewport". LinkedIn's
+// "People also viewed" sidebar sits right alongside the top card, at a similar
+// vertical position, and shows its own Pending/Withdraw state for whoever else
+// you've already invited — a Y-position check alone can't tell those apart from
+// the profile you're actually acting on, and that's what caused false "sent"
+// reports for the wrong person. Checking actual DOM containment can.
 function isAlreadyInvited() {
+  const top = getProfileTopCard();
+  if (top) {
+    const withinTopCard = Array.from(top.querySelectorAll('button, a, [role="button"], [aria-label]')).some((el) => {
+      if (!isElementVisible(el)) return false;
+      const label = normalizeText((el.getAttribute && el.getAttribute("aria-label")) || "").toLowerCase();
+      const text = normalizeText(el.textContent || "").toLowerCase();
+      return /withdraw invitation/.test(label) || /withdraw invitation/.test(text);
+    });
+    return withinTopCard;
+  }
+  // Top card didn't render (rare) — fall back to a page-wide search. Less
+  // reliable (could match a sidebar suggestion instead), but there's no
+  // better signal available if we can't find the top card at all.
   const els = Array.from(document.querySelectorAll('button, a, [role="button"], [aria-label]'));
   for (const el of els) {
     if (!isElementVisible(el)) continue;
