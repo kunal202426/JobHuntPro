@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { useGoogleLogin } from '@react-oauth/google'
 
 const COLD_API = import.meta.env.VITE_COLD_API_URL || 'http://localhost:8000'
+const LINKEDIN_API = import.meta.env.VITE_LINKEDIN_API_URL || 'http://localhost:3001'
 
 const DEFAULT_FORM = {
   // Gmail
@@ -43,6 +44,35 @@ export default function SettingsPage() {
   const [hasGeminiKey, setHasGeminiKey] = useState(false)
   const [hasClaudeKey, setHasClaudeKey] = useState(false)
   const [hasGmailPassword, setHasGmailPassword] = useState(false)
+  const [resetting, setResetting] = useState(false)
+  const [resetMsg, setResetMsg] = useState('')
+
+  async function handleResetAccount() {
+    const confirmText = 'Type RESET to permanently delete all your scraped jobs, applications, LinkedIn leads, and cold-email leads/mails:'
+    const typed = window.prompt(confirmText)
+    if (typed !== 'RESET') return
+
+    setResetting(true)
+    setResetMsg('')
+    try {
+      const [liRes, coldRes] = await Promise.all([
+        fetch(`${LINKEDIN_API}/api/account/reset`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+        fetch(`${COLD_API}/api/account/reset`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+      ])
+      if (!liRes.ok || !coldRes.ok) throw new Error('Reset failed on one or both backends')
+      setResetMsg('Account reset — all jobs, leads, and mails cleared.')
+    } catch (err) {
+      setResetMsg(`Reset failed: ${err.message}`)
+    } finally {
+      setResetting(false)
+    }
+  }
 
   // Inline Gmail OAuth connect (auth-code flow → backend exchanges for a
   // refresh token with gmail.send scope, stored encrypted).
@@ -346,6 +376,27 @@ export default function SettingsPage() {
           {/* ── Section: Chrome Extension ─────────────────── */}
           <Section title="Chrome Extension (LinkedIn scraping + auto-connect)">
             <ExtensionTutorial />
+          </Section>
+
+          {/* ── Section: Danger Zone ───────────────────────── */}
+          <Section title="Danger Zone">
+            <p style={{ color: '#9a8a7e', fontSize: 12, marginBottom: 12 }}>
+              Permanently deletes everything: scraped jobs, applied jobs, LinkedIn leads, and cold-email leads/mails across both backends.
+              Your account, profile, and settings are kept.
+            </p>
+            <button
+              type="button"
+              onClick={handleResetAccount}
+              disabled={resetting}
+              style={{
+                background: '#fdf2f2', border: '1px solid #e8b4b4', borderRadius: 6,
+                color: '#b84848', cursor: 'pointer', fontSize: 13, fontWeight: 600,
+                padding: '8px 16px',
+              }}
+            >
+              {resetting ? 'Resetting…' : 'Reset Account'}
+            </button>
+            {resetMsg && <p style={{ color: resetMsg.startsWith('Reset failed') ? '#b84848' : '#4a8f47', fontSize: 13, marginTop: 10 }}>{resetMsg}</p>}
           </Section>
 
           {error && <p style={{ color: '#b84848', fontSize: 13, marginBottom: 12 }}>{error}</p>}

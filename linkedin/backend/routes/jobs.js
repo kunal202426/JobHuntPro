@@ -202,24 +202,37 @@ router.delete("/:id", async (req, res) => {
   }
 });
 
-// POST /api/jobs/clear-all — wipe every job for this user (all statuses,
-// including ones with linked li_leads). Used for a full fresh-start reset.
-router.post("/clear-all", async (req, res) => {
+// POST /api/jobs/clear-unapplied — wipe every scraped job that hasn't been
+// applied to (any age, regardless of linked li_leads). Applied/interviewing/
+// offer jobs are NEVER touched here.
+router.post("/clear-unapplied", async (req, res) => {
   const uid = req.userId;
   try {
     const deleted = await withTransaction(async (client) => {
       await client.query(
         `UPDATE connection_queue SET lead_id = NULL
-         WHERE lead_id IN (SELECT id FROM li_leads WHERE user_id = $1)`,
+         WHERE lead_id IN (
+           SELECT l.id FROM li_leads l
+           JOIN jobs j ON j.id = l.job_id
+           WHERE l.user_id = $1 AND j.status NOT IN ('applied', 'interviewing', 'offer', 'rejected', 'ghosted')
+         )`,
         [uid]
       );
-      await client.query("DELETE FROM li_leads WHERE user_id = $1", [uid]);
-      const result = await client.query("DELETE FROM jobs WHERE user_id = $1", [uid]);
+      await client.query(
+        `DELETE FROM li_leads WHERE user_id = $1 AND job_id IN (
+           SELECT id FROM jobs WHERE user_id = $1 AND status NOT IN ('applied', 'interviewing', 'offer', 'rejected', 'ghosted')
+         )`,
+        [uid]
+      );
+      const result = await client.query(
+        `DELETE FROM jobs WHERE user_id = $1 AND status NOT IN ('applied', 'interviewing', 'offer', 'rejected', 'ghosted')`,
+        [uid]
+      );
       return result.rowCount ?? 0;
     });
     res.json({ ok: true, deleted });
   } catch (err) {
-    console.error("[Jobs/clear-all] Error:", err.message);
+    console.error("[Jobs/clear-unapplied] Error:", err.message);
     res.status(500).json({ error: err.message });
   }
 });
@@ -235,7 +248,7 @@ router.post("/cleanup-old", async (req, res) => {
   const params = [uid, cutoff, uid];
   let query = `DELETE FROM jobs WHERE user_id = $1 AND created_at < $2 AND NOT EXISTS (SELECT 1 FROM li_leads WHERE li_leads.job_id = jobs.id AND li_leads.user_id = $3)`;
 
-  if (!includeActive) query += " AND status NOT IN ('applied', 'interviewing', 'offer')";
+  if (!includeActive) query += " AND status NOT IN ('applied', 'interviewing', 'offer', 'rejected', 'ghosted')";
 
   try {
     const deleted = await execute(query, params);

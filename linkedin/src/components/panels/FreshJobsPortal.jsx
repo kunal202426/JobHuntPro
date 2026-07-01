@@ -285,11 +285,12 @@ export default function FreshJobsPortal() {
     } catch { toast.error("Failed to delete old jobs."); } finally { setCleanupBusy(false); }
   }
 
-  async function clearAllJobs() {
-    if (!window.confirm(`Delete ALL ${jobs.length} scraped jobs (including applied ones)? This can't be undone.`)) return;
+  async function clearUnappliedJobs() {
+    const count = jobs.filter((j) => !APP_STATUSES.has(j.status)).length;
+    if (!window.confirm(`Delete ${count} scraped-but-not-applied job(s)? Applied jobs are never touched. This can't be undone.`)) return;
     setClearAllBusy(true);
     try {
-      const res = await client.post("/api/jobs/clear-all");
+      const res = await client.post("/api/jobs/clear-unapplied");
       toast.success(`Deleted ${res.data?.deleted || 0} jobs.`);
       await refetch();
     } catch { toast.error("Failed to clear jobs."); } finally { setClearAllBusy(false); }
@@ -571,12 +572,15 @@ export default function FreshJobsPortal() {
                   {cleanupBusy ? "Deleting…" : "Delete Old Jobs (>24h)"}
                 </button>
                 <button
-                  onClick={clearAllJobs}
+                  onClick={clearUnappliedJobs}
                   disabled={clearAllBusy}
                   className={`${BTN} w-full border border-rose-300 bg-rose-50 text-rose-700 hover:bg-rose-100`}
                 >
-                  {clearAllBusy ? "Deleting…" : `Clear All Jobs (${jobs.length})`}
+                  {clearAllBusy ? "Deleting…" : `Delete Scraped Jobs (not applied) (${jobs.filter((j) => !APP_STATUSES.has(j.status)).length})`}
                 </button>
+                <p className="text-[9px] text-slate-400">
+                  For a full account reset (jobs, leads, cold-email mails) go to Settings.
+                </p>
               </div>
             )}
           </div>

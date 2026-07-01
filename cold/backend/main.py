@@ -12,7 +12,7 @@ from slowapi.errors import RateLimitExceeded
 from limiter import limiter
 
 from database import engine, Base
-from routers import leads, quota
+from routers import leads, quota, account
 from routers.auth import router as auth_router
 from routers.admin import router as admin_router
 from services.email_queue import start_queue_worker
@@ -143,6 +143,7 @@ app.include_router(auth_router)
 app.include_router(admin_router)
 app.include_router(leads.router)
 app.include_router(quota.router)
+app.include_router(account.router)
 
 
 @app.get("/health")

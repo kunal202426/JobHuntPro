@@ -12,6 +12,7 @@ import statsRouter from "./routes/stats.js";
 import scrapeRouter from "./routes/scrape.js";
 import applyRouter from "./routes/apply.js";
 import adminRouter from "./routes/admin.js";
+import accountRouter from "./routes/account.js";
 import { requireAuth } from "./middleware/auth.js";
 
 dotenv.config();
@@ -52,6 +53,7 @@ app.use("/api/queue", requireAuth, queueRouter);
 app.use("/api/stats", requireAuth, statsRouter);
 app.use("/api/scrape", requireAuth, scrapeRouter);
 app.use("/api/apply", requireAuth, applyRouter);
+app.use("/api/account", requireAuth, accountRouter);
 app.use("/admin", requireAuth, adminRouter);
 
 app.get("/health", (req, res) => res.json({ status: "ok", service: "linkedin-api" }));
