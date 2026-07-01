@@ -356,10 +356,20 @@
 
   const applyQueue = [];
   let applyQueueRunning = false;
+  let appliedCount = 0;
 
   function enqueueForApply(card, job) {
     applyQueue.push({ card, job });
     runApplyQueue();
+  }
+
+  // Sent one job at a time, bypassing the scrape batch debounce, so each
+  // apply shows up on the dashboard immediately instead of waiting to be
+  // batched with whatever else the scroller finds next.
+  function sendJobImmediately(job) {
+    chrome.runtime.sendMessage({ type: "JOBS_SCRAPED", payload: [job] }, (res) => {
+      if (chrome.runtime.lastError) console.warn("[Instahyre]", chrome.runtime.lastError.message);
+    });
   }
 
   async function runApplyQueue() {
@@ -372,9 +382,9 @@
           const outcome = await attemptApply(card);
           if (outcome.status === "applied" || outcome.status === "already_applied") {
             job.status = "applied";
-            pendingJobs.push(job);
-            debouncedSend();
-            console.log(`[Instahyre] Applied: ${job.title} @ ${job.company}`);
+            appliedCount++;
+            sendJobImmediately(job);
+            console.log(`[Instahyre] Applied (${appliedCount}): ${job.title} @ ${job.company}`);
           } else if (outcome.status === "discarded") {
             console.log(`[Instahyre] Skipped (too experienced, ${outcome.error}): ${job.title} @ ${job.company}`);
             // Not saved — matches the old separate-apply flow's discard behavior.
@@ -383,14 +393,12 @@
             // modal never opened) — still save it as a normal unseen job so
             // it isn't lost; it can be retried later via IH Apply.
             console.warn(`[Instahyre] Apply failed (${outcome.error}) — saved as unseen: ${job.title} @ ${job.company}`);
-            pendingJobs.push(job);
-            debouncedSend();
+            sendJobImmediately(job);
           }
         } catch (err) {
           console.warn("[Instahyre] Apply queue error:", err.message);
           closeModal();
-          pendingJobs.push(job);
-          debouncedSend();
+          sendJobImmediately(job);
         }
         await sleep(600);
       }
@@ -460,14 +468,22 @@
     let lastSeenCount = seenUrls.size;
     const MAX_CYCLES = 24;
     const MAX_IDLE = 5;
-    const MAX_PAGES = 6;
+    const MAX_PAGES = 20; // 76+ jobs at ~30/page needs more than the old cap of 6
 
     console.log("[Instahyre] Auto-scroll started");
     autoScrollTimer = setInterval(() => {
+      // Pagination REPLACES the whole card list — if we advance while jobs are
+      // still sitting in the apply queue, their DOM references go stale and
+      // silently fail to apply. Never scroll/paginate while there's apply work
+      // outstanding; just wait for the queue to drain, then continue.
+      if (applyQueue.length > 0 || applyQueueRunning) return;
+
       container.scrollBy({ top: 900, left: 0, behavior: "smooth" });
       cycles++;
 
       setTimeout(() => {
+        if (applyQueue.length > 0 || applyQueueRunning) return; // queue filled during the scroll itself
+
         scrapeAllCards(`Auto-scroll cycle ${cycles}`);
         if (seenUrls.size > lastSeenCount) {
           lastSeenCount = seenUrls.size;
@@ -478,6 +494,7 @@
         idleCycles++;
         const atBottom = Math.ceil(container.scrollTop + container.clientHeight) >= (container.scrollHeight - 10);
         if ((idleCycles >= MAX_IDLE || atBottom) && pageClicks < MAX_PAGES) {
+          if (applyQueue.length > 0 || applyQueueRunning) return; // don't paginate mid-apply
           const moved = clickNextPage();
           if (moved) {
             pageClicks++;
