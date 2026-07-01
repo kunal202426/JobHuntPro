@@ -360,20 +360,36 @@
 
   function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
 
+  // The sidebar has several Selectize widgets (Skills, Job Functions,
+  // Industries, Locations, Companies) — each renders its own
+  // ".selectize-control > .selectize-input + .selectize-dropdown" pair. A bare
+  // document.querySelector(".selectize-dropdown.multi") returns whichever one
+  // happens to be first in DOM order, NOT necessarily the one we just opened.
+  // Everything below is scoped through the #job-functions-selectized input's
+  // own .selectize-control wrapper so we never touch another widget by mistake.
+  function getJobFunctionsControl() {
+    const input = document.getElementById("job-functions-selectized");
+    return input ? input.closest(".selectize-control") : null;
+  }
+
   function isJobFunctionSelected(value) {
-    return Array.from(document.querySelectorAll(".selectize-input .item"))
+    const control = getJobFunctionsControl();
+    if (!control) return false;
+    return Array.from(control.querySelectorAll(".item"))
       .some((el) => el.getAttribute("data-value") === value);
   }
 
   async function openJobFunctionsDropdown() {
+    const control = getJobFunctionsControl();
     const input = document.getElementById("job-functions-selectized");
-    if (!input) return null;
+    if (!control || !input) return null;
 
+    const inputWrap = control.querySelector(".selectize-input");
+    (inputWrap || input).dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
     input.focus();
-    input.click();
 
     for (let i = 0; i < 10; i++) {
-      const dropdown = document.querySelector(".selectize-dropdown.multi");
+      const dropdown = control.querySelector(".selectize-dropdown");
       if (dropdown && dropdown.style.display !== "none") return dropdown;
       await sleep(200);
     }
@@ -384,25 +400,35 @@
     if (isJobFunctionSelected(value)) return true;
 
     const dropdown = await openJobFunctionsDropdown();
-    if (!dropdown) return false;
+    if (!dropdown) {
+      console.warn("[Instahyre] Job-functions dropdown did not open for", value);
+      return false;
+    }
 
     let target = Array.from(dropdown.querySelectorAll(".option"))
       .find((o) => o.getAttribute("data-value") === value);
 
     // Fall back to clicking the optgroup header for categories with no direct
-    // "All -" option row (e.g. Software Engineering).
+    // "All -" option row.
     if (!target && CATEGORY_HEADER_FALLBACK[value]) {
       const label = CATEGORY_HEADER_FALLBACK[value];
       target = Array.from(dropdown.querySelectorAll(".optgroup-header"))
         .find((h) => cleanText(h.textContent) === label);
     }
 
-    if (!target) return false;
+    if (!target) {
+      console.warn("[Instahyre] Option not found in job-functions dropdown for", value);
+      return false;
+    }
 
     target.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+    target.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
     target.click();
-    await sleep(300);
-    return isJobFunctionSelected(value);
+    await sleep(400);
+
+    const selected = isJobFunctionSelected(value);
+    console.log(`[Instahyre] selectJobFunction(${value}) ->`, selected);
+    return selected;
   }
 
   function setYearsInput(years) {
@@ -433,8 +459,16 @@
       }
 
       for (const value of JOB_FUNCTION_VALUES) {
-        const ok = await selectJobFunction(value);
-        if (!ok) console.warn("[Instahyre] Could not select job function", value);
+        await selectJobFunction(value);
+      }
+
+      // Verify both selections actually stuck before submitting — if we click
+      // Show Results with a partially-cleared or empty job_functions field,
+      // Instahyre just runs an unfiltered search and we'd never know.
+      const stillMissing = JOB_FUNCTION_VALUES.filter((v) => !isJobFunctionSelected(v));
+      if (stillMissing.length > 0) {
+        console.warn("[Instahyre] Job functions did not stick:", stillMissing, "— aborting filtered search, scraping default feed instead");
+        return false;
       }
 
       setYearsInput(TARGET_YEARS);
