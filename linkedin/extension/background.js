@@ -25,10 +25,14 @@ const SCRAPE_SOURCES = {
     injectFile: "content/cutshort.js",
   },
   instahyre: {
-    // Instahyre's own recommendation feed, filtered server-side: company_size=0 (all),
-    // job_functions = Software Engineering / Backend / Full-Stack, job_type=0 (all),
-    // years=0 → recommends fresher/0-1 YOE roles instead of the generic city listing.
-    url: "https://www.instahyre.com/candidate/opportunities/?company_size=0&job_functions=%2Fapi%2Fv1%2Fjob_category%2F1,%2Fapi%2Fv1%2Fjob_function%2F10,%2Fapi%2Fv1%2Fjob_function%2F1&job_type=0&search=true&years=0",
+    // Instahyre's Angular app does NOT read search filters (years, job_functions,
+    // company_size, ...) from the query string on load — those only apply when
+    // the sidebar form is submitted client-side. A direct URL with those params
+    // just lands on the default recommended/matching feed and ignores them
+    // (confirmed: it showed "No matching opportunities found"). So we use the
+    // plain recommended feed and rely on the card + in-modal experience gate
+    // (job_match.js / instahyre.js) to drop anything wanting >1 year.
+    url: "https://www.instahyre.com/candidate/opportunities/",
     hostPrefix: "https://www.instahyre.com/",
     injectFile: "content/instahyre.js",
   },
