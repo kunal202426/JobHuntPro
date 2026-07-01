@@ -201,15 +201,15 @@
     trigger.click();
 
     let root = null;
-    for (let i = 0; i < 16; i++) {
+    for (let i = 0; i < 30; i++) {
       root = findModalRoot();
       if (root && root.querySelector("button, a.btn, .btn") && cleanText(root.textContent).length > 20) break;
-      await sleep(400);
+      await sleep(150);
       root = null;
     }
     if (!root) return { status: "failed", error: "apply_modal_did_not_open" };
 
-    await sleep(400); // let Angular finish rendering job details
+    await sleep(150); // let Angular finish rendering job details
 
     if (alreadyApplied(root)) {
       closeModal();
@@ -227,8 +227,8 @@
     btn.click();
 
     let result = { status: "failed", error: "apply_unconfirmed" };
-    for (let i = 0; i < 20; i++) {
-      await sleep(500);
+    for (let i = 0; i < 24; i++) {
+      await sleep(200);
       const stillRoot = findModalRoot();
       if (!stillRoot || alreadyApplied(stillRoot) || !findApplyButton(stillRoot)) {
         result = { status: "applied" };
@@ -282,7 +282,7 @@
           closeModal();
         }
 
-        await sleep(600);
+        await sleep(150); // just enough for the modal-close animation to finish
       }
 
       if (foundThisCycle > 0) idleCycles = 0; else idleCycles++;
