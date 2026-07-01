@@ -371,7 +371,9 @@
           } else {
             // Apply failed for a technical reason (button missing, timeout,
             // modal never opened) — still save it as a normal unseen job so
-            // it isn't lost; it can be retried later via IH Apply.
+            // it isn't lost. To retry: use "Delete Scraped Jobs (not applied)"
+            // then scrape again — the fresh row will go through the apply
+            // attempt once more (a duplicate row would just be skipped).
             console.warn(`[Instahyre] Apply failed (${outcome.error}) — saved as unseen: ${job.title} @ ${job.company}`);
             sendJobImmediately(job);
           }

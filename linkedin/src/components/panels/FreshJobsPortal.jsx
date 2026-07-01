@@ -130,8 +130,6 @@ export default function FreshJobsPortal() {
   const [companyQuery,      setCompanyQuery]      = useState("");
   const [companySource,     setCompanySource]     = useState("all");
   const [companyScrapeBusy, setCompanyScrapeBusy] = useState(false);
-  const [applyBusy,         setApplyBusy]         = useState(false);
-  const [applyCounts,       setApplyCounts]       = useState(null);
 
   const { jobs, loading, error, refetch, updateStatus, dismissJob } = useJobs();
 
@@ -216,64 +214,6 @@ export default function FreshJobsPortal() {
     } finally {
       setCompanyScrapeBusy(false);
     }
-  }
-
-  const applyPrevActiveRef = useRef(false);
-  useEffect(() => {
-    let mounted = true;
-    const poll = async () => {
-      try {
-        const res = await client.get("/api/apply/status");
-        if (!mounted) return;
-        const counts = res.data?.counts || {};
-        setApplyCounts(counts);
-        const active = (counts.pending || 0) + (counts.processing || 0) > 0;
-        if (applyPrevActiveRef.current && !active) refetch();
-        applyPrevActiveRef.current = active;
-      } catch { /* ignore */ }
-    };
-    poll();
-    const id = setInterval(poll, 4000);
-    return () => { mounted = false; clearInterval(id); };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const instahyreToApply = jobs.filter(
-    (j) => String(j.source || "").toLowerCase() === "instahyre" && j.status !== "applied"
-  ).length;
-  const applyActive = !!applyCounts && ((applyCounts.pending || 0) + (applyCounts.processing || 0) > 0);
-  const applyLeft   = applyCounts ? (applyCounts.pending || 0) + (applyCounts.processing || 0) : 0;
-
-  async function handleEasyApplyInstahyre() {
-    if (!extDetected) {
-      toast.error("Extension not connected.\nInstall from Settings → Chrome Extension section.", {
-        duration: 6000, style: { whiteSpace: "pre-line" },
-      });
-      setShowStatusPanel(true);
-      return;
-    }
-    if (instahyreToApply === 0) {
-      toast.error("No Instahyre jobs to apply to. Scrape Instahyre first.");
-      return;
-    }
-    if (!window.confirm(`Apply to ${instahyreToApply} Instahyre job(s)?\nThis submits real applications on your behalf.`)) return;
-    setApplyBusy(true);
-    try {
-      const res = await client.post("/api/apply/instahyre");
-      toast.success(`Queued ${res.data?.queued ?? 0} job(s) — applying in background…`, { duration: 4000 });
-      window.dispatchEvent(new CustomEvent("jh:trigger-apply"));
-    } catch (err) {
-      toast.error(err.response?.data?.error || "Failed to queue applications.");
-    } finally {
-      setApplyBusy(false);
-    }
-  }
-
-  async function cancelApply() {
-    try {
-      await client.post("/api/apply/stop");
-      setApplyCounts((c) => ({ ...(c || {}), pending: 0, processing: 0 }));
-      toast.success("Apply run cancelled.");
-    } catch { toast.error("Failed to cancel."); }
   }
 
   async function cleanupOldJobs() {
@@ -440,7 +380,7 @@ export default function FreshJobsPortal() {
               </div>
             )}
 
-            {/* Row A: Portal scrape + Instahyre apply */}
+            {/* Row A: Portal scrape */}
             <div className="flex items-center gap-1.5 flex-wrap">
               <select value={scrapeSource} onChange={(e) => setScrapeSource(e.target.value)} className={SEL + " w-28"}>
                 <option value="linkedin">LinkedIn</option>
@@ -472,35 +412,6 @@ export default function FreshJobsPortal() {
               >
                 {isActivelyScraping ? "● Status" : "≡ Status"}
               </button>
-
-              <div className="mx-0.5 h-4 w-px shrink-0 bg-stone-300" />
-
-              {/* Instahyre easy apply — compact, not full-width */}
-              <button
-                onClick={handleEasyApplyInstahyre}
-                disabled={applyBusy || applyActive || instahyreToApply === 0}
-                title="Auto-apply to all Instahyre jobs"
-                className={`${BTN} ${
-                  applyActive
-                    ? "bg-emerald-100 text-emerald-800 border border-emerald-300"
-                    : "bg-emerald-600 text-white hover:bg-emerald-500"
-                }`}
-              >
-                {applyActive
-                  ? `Applying… ${applyLeft} left`
-                  : applyBusy
-                  ? "Queuing…"
-                  : `⚡ IH Apply${instahyreToApply ? ` (${instahyreToApply})` : ""}`}
-              </button>
-
-              {applyActive && (
-                <button
-                  onClick={cancelApply}
-                  className={`${BTN} border border-rose-300 bg-rose-50 text-rose-700 hover:bg-rose-100`}
-                >
-                  ✕
-                </button>
-              )}
             </div>
 
             {/* Row B: Company search */}
