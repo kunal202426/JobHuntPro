@@ -123,6 +123,7 @@ export default function FreshJobsPortal() {
   const [scrapeSource,      setScrapeSource]      = useState("linkedin");
   const [scrapeBusy,        setScrapeBusy]        = useState(false);
   const [cleanupBusy,       setCleanupBusy]       = useState(false);
+  const [clearAllBusy,      setClearAllBusy]      = useState(false);
   const [scrapeState,       setScrapeState]       = useState([]);
   const [showStatusPanel,   setShowStatusPanel]   = useState(false);
   const [extDetected,       setExtDetected]       = useState(false);
@@ -282,6 +283,16 @@ export default function FreshJobsPortal() {
       toast.success(`Deleted ${res.data?.deleted || 0} old jobs.`);
       await refetch();
     } catch { toast.error("Failed to delete old jobs."); } finally { setCleanupBusy(false); }
+  }
+
+  async function clearAllJobs() {
+    if (!window.confirm(`Delete ALL ${jobs.length} scraped jobs (including applied ones)? This can't be undone.`)) return;
+    setClearAllBusy(true);
+    try {
+      const res = await client.post("/api/jobs/clear-all");
+      toast.success(`Deleted ${res.data?.deleted || 0} jobs.`);
+      await refetch();
+    } catch { toast.error("Failed to clear jobs."); } finally { setClearAllBusy(false); }
   }
 
   if (error === "backend_offline") {
@@ -558,6 +569,13 @@ export default function FreshJobsPortal() {
                   className={`${BTN} w-full border border-stone-300 bg-white text-slate-600 hover:bg-stone-100`}
                 >
                   {cleanupBusy ? "Deleting…" : "Delete Old Jobs (>24h)"}
+                </button>
+                <button
+                  onClick={clearAllJobs}
+                  disabled={clearAllBusy}
+                  className={`${BTN} w-full border border-rose-300 bg-rose-50 text-rose-700 hover:bg-rose-100`}
+                >
+                  {clearAllBusy ? "Deleting…" : `Clear All Jobs (${jobs.length})`}
                 </button>
               </div>
             )}

@@ -202,6 +202,28 @@ router.delete("/:id", async (req, res) => {
   }
 });
 
+// POST /api/jobs/clear-all — wipe every job for this user (all statuses,
+// including ones with linked li_leads). Used for a full fresh-start reset.
+router.post("/clear-all", async (req, res) => {
+  const uid = req.userId;
+  try {
+    const deleted = await withTransaction(async (client) => {
+      await client.query(
+        `UPDATE connection_queue SET lead_id = NULL
+         WHERE lead_id IN (SELECT id FROM li_leads WHERE user_id = $1)`,
+        [uid]
+      );
+      await client.query("DELETE FROM li_leads WHERE user_id = $1", [uid]);
+      const result = await client.query("DELETE FROM jobs WHERE user_id = $1", [uid]);
+      return result.rowCount ?? 0;
+    });
+    res.json({ ok: true, deleted });
+  } catch (err) {
+    console.error("[Jobs/clear-all] Error:", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // POST /api/jobs/cleanup-old
 router.post("/cleanup-old", async (req, res) => {
   const uid = req.userId;
