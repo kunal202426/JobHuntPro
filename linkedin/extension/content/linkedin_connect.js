@@ -417,16 +417,6 @@ function isFollowOnly() {
   return !!followBtn && !findDirectConnectButton();
 }
 
-function findMenuContainer() {
-  const menus = Array.from(document.querySelectorAll(
-    "[role='menu'], .artdeco-dropdown__content, .artdeco-dropdown__content-inner, .artdeco-dropdown__item-container, [popover='manual'] [role='menu']"
-  ));
-  for (const menu of menus) {
-    if (isElementVisible(menu)) return menu;
-  }
-  return menus[0] || null;
-}
-
 function findMenuItemByText(menu, textPattern) {
   if (!menu) return null;
   const candidates = Array.from(menu.querySelectorAll(
@@ -451,7 +441,12 @@ function menuLooksLikeActionPopover(menu) {
   }
 }
 
-async function waitForActionMenu(timeoutMs = 3500) {
+// excludeMenus: menus already visible BEFORE we clicked — a menu from that set
+// was sitting open independently of our click (e.g. a suggestion card's own
+// dropdown) and must never be mistaken for the one we just opened.
+// anchorRect: the "More" button's own position — a genuine result of our
+// click renders anchored near it; anything far away isn't ours either.
+async function waitForActionMenu(timeoutMs = 3500, excludeMenus = null, anchorRect = null) {
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
     const menus = Array.from(document.querySelectorAll(
@@ -459,6 +454,8 @@ async function waitForActionMenu(timeoutMs = 3500) {
     ));
     for (const menu of menus) {
       if (!isElementVisible(menu)) continue;
+      if (excludeMenus && excludeMenus.has(menu)) continue;
+      if (!isNearAnchor(menu, anchorRect)) continue;
       if (menuLooksLikeActionPopover(menu)) return menu;
     }
     await sleep(120);
@@ -490,6 +487,29 @@ function findConnectInMenu(menu) {
   return null;
 }
 
+// Menu-like popups currently visible, so we can tell a menu that opened as a
+// direct result of OUR click apart from one that was already sitting open —
+// e.g. a "People also viewed" suggestion card's own dropdown lingering nearby.
+function getVisibleMenuElements() {
+  const selector = "[popover='manual'] [role='menu'], [role='menu'], .artdeco-dropdown__content, .artdeco-dropdown__content-inner, .artdeco-dropdown__item-container";
+  return new Set(Array.from(document.querySelectorAll(selector)).filter(isElementVisible));
+}
+
+// Dropdowns render anchored to their trigger button — a menu that's actually
+// ours will be close to it. A suggestion card's own popup elsewhere on the
+// page won't be, even if it happens to be visible at the same moment.
+function isNearAnchor(menu, anchorRect, maxDistance = 400) {
+  if (!anchorRect) return true;
+  try {
+    const r = menu.getBoundingClientRect();
+    const dx = Math.max(anchorRect.left - r.right, r.left - anchorRect.right, 0);
+    const dy = Math.max(anchorRect.top - r.bottom, r.top - anchorRect.bottom, 0);
+    return Math.hypot(dx, dy) <= maxDistance;
+  } catch (e) {
+    return true;
+  }
+}
+
 async function tryMoreActionsConnect() {
   // The new LinkedIn profile has SEVERAL "More" buttons (profile actions AND
   // every post in the activity feed). Clicking the wrong one opens a post menu
@@ -509,10 +529,14 @@ async function tryMoreActionsConnect() {
   let sawFollow = false;
 
   for (const moreBtn of moreButtons) {
+    const menusBefore = getVisibleMenuElements();
+    let anchorRect = null;
+    try { anchorRect = moreBtn.getBoundingClientRect(); } catch (e) { /* ignore */ }
+
     robustClick(moreBtn);
     await sleep(400);
 
-    const menu = await waitForActionMenu(2500) || findMenuContainer();
+    const menu = await waitForActionMenu(2500, menusBefore, anchorRect);
     if (!menu) { closeAnyMenu(); await sleep(150); continue; }
 
     // Already invited? The profile menu shows "Withdraw invitation"/"Pending"
