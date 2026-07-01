@@ -340,6 +340,102 @@
     }, 1500);
   }
 
+  // --- Search-form automation -----------------------------------------------
+  // Instahyre's Angular app never reads search filters from the URL — they only
+  // apply once the sidebar "Search other jobs" form is filled and "Show results"
+  // is clicked (confirmed: submitting produces a plain ?matching=true URL, no
+  // query params at all). So we drive the form directly: select "All - Software
+  // Engineering" + "All - Data Science and Analysis" job functions, set
+  // Experience (years) = 0, then click Show results.
+  const JOB_FUNCTION_VALUES = ["/api/v1/job_category/1", "/api/v1/job_category/8"];
+  const TARGET_YEARS = "0";
+
+  function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
+
+  function isJobFunctionSelected(value) {
+    return Array.from(document.querySelectorAll(".selectize-input .item"))
+      .some((el) => el.getAttribute("data-value") === value);
+  }
+
+  async function selectJobFunction(value) {
+    if (isJobFunctionSelected(value)) return true;
+
+    const input = document.getElementById("job-functions-selectized");
+    if (!input) return false;
+
+    input.focus();
+    input.click();
+
+    let dropdown = null;
+    for (let i = 0; i < 10; i++) {
+      dropdown = document.querySelector(".selectize-dropdown.multi");
+      if (dropdown && dropdown.style.display !== "none") break;
+      await sleep(200);
+      dropdown = null;
+    }
+    if (!dropdown) return false;
+
+    const option = Array.from(dropdown.querySelectorAll(".option"))
+      .find((o) => o.getAttribute("data-value") === value);
+    if (!option) return false;
+
+    option.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+    option.click();
+    await sleep(300);
+    return isJobFunctionSelected(value);
+  }
+
+  function setYearsInput(years) {
+    const input = document.getElementById("years");
+    if (!input) return false;
+    const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
+    setter.call(input, years);
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+    return true;
+  }
+
+  async function applyInstahyreFilters() {
+    try {
+      let ready = false;
+      for (let i = 0; i < 20; i++) {
+        if (document.getElementById("job-functions-selectized") &&
+            document.getElementById("years") &&
+            document.getElementById("show-results")) {
+          ready = true;
+          break;
+        }
+        await sleep(300);
+      }
+      if (!ready) {
+        console.log("[Instahyre] Search form not found — scraping the default recommended feed");
+        return false;
+      }
+
+      for (const value of JOB_FUNCTION_VALUES) {
+        const ok = await selectJobFunction(value);
+        if (!ok) console.warn("[Instahyre] Could not select job function", value);
+      }
+
+      setYearsInput(TARGET_YEARS);
+      await sleep(300);
+
+      const showBtn = document.getElementById("show-results");
+      if (!showBtn || showBtn.disabled || showBtn.getAttribute("disabled") !== null) {
+        console.log("[Instahyre] Show results button disabled — filters may not have registered");
+        return false;
+      }
+
+      showBtn.click();
+      console.log("[Instahyre] Search filters applied: Software Engineering + Data Science, 0 years");
+      await sleep(2500); // let the search results render
+      return true;
+    } catch (err) {
+      console.warn("[Instahyre] applyInstahyreFilters error:", err.message);
+      return false;
+    }
+  }
+
   function observeResults() {
     const listTarget =
       document.querySelector(".opp-list-container") ||
@@ -368,13 +464,17 @@
     observer.observe(listTarget, { childList: true, subtree: true });
   }
 
-  const initialCount = scrapeAllCards("Initial scrape");
-  if (initialCount === 0) {
-    [1200, 3000, 6000].forEach((delay) => {
-      setTimeout(() => scrapeAllCards(`Retry +${delay}ms`), delay);
-    });
-  }
+  (async () => {
+    await applyInstahyreFilters();
 
-  observeResults();
-  setTimeout(startAutoScroll, 1800);
+    const initialCount = scrapeAllCards("Initial scrape");
+    if (initialCount === 0) {
+      [1200, 3000, 6000].forEach((delay) => {
+        setTimeout(() => scrapeAllCards(`Retry +${delay}ms`), delay);
+      });
+    }
+
+    observeResults();
+    setTimeout(startAutoScroll, 1800);
+  })();
 })();
