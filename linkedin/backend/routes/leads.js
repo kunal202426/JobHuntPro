@@ -53,21 +53,33 @@ router.post("/batch", async (req, res) => {
   const uid = req.userId;
   const { profiles, job_id, company } = req.body;
 
-  if (!Array.isArray(profiles) || profiles.length === 0 || !job_id) {
+  if (!Array.isArray(profiles) || profiles.length === 0) {
     return res.json({ saved: 0, rejected: 0, duplicates: 0 });
   }
 
-  const job = await getRow("SELECT title, company FROM jobs WHERE id = $1 AND user_id = $2", [job_id, uid]);
-  if (!job) return res.status(404).json({ error: "Job not found" });
+  // job_id is optional now — a "find leads by company name" request has no
+  // job at all. The extension sends '' in that case (job_id column is NOT
+  // NULL), which we treat the same as "not provided".
+  const hasJob = !!job_id;
+  let targetCompany = company;
+  let jobTitle = null;
 
-  const targetCompany = company || job.company;
-  const jobTitle = job.title;
+  if (hasJob) {
+    const job = await getRow("SELECT title, company FROM jobs WHERE id = $1 AND user_id = $2", [job_id, uid]);
+    if (!job) return res.status(404).json({ error: "Job not found" });
+    targetCompany = company || job.company;
+    jobTitle = job.title;
+  } else if (!targetCompany) {
+    return res.status(400).json({ error: "company required when no job_id is given" });
+  }
+
+  const jobIdForRows = hasJob ? job_id : "";
 
   const newProfiles = [];
   for (const p of profiles) {
     const existing = await getRow(
       "SELECT id FROM li_leads WHERE profile_url = $1 AND job_id = $2 AND user_id = $3",
-      [p.profile_url, job_id, uid]
+      [p.profile_url, jobIdForRows, uid]
     );
     if (!existing) newProfiles.push(p);
   }
@@ -100,7 +112,7 @@ router.post("/batch", async (req, res) => {
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'not_queued')
          ON CONFLICT DO NOTHING`,
         [
-          uuidv4(), uid, job_id,
+          uuidv4(), uid, jobIdForRows,
           p.name, p.title || null, p.company || targetCompany,
           p.profile_url, s?.score ?? null, s?.reason ?? null, s?.category ?? "peer",
         ]

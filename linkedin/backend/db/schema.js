@@ -194,6 +194,10 @@ export async function initDB() {
   await addColumnIfMissing(client, "connection_queue", "user_id", "TEXT");
   await addColumnIfMissing(client, "connection_queue", "profile_url", "TEXT");
   await addColumnIfMissing(client, "scrape_tasks", "company", "TEXT");
+  // Direct "find leads by company name" (no job attached) — job_id is stored
+  // as '' (empty string) for these rows since the column is NOT NULL.
+  await addColumnIfMissing(client, "find_leads_queue", "requested_count", "INTEGER");
+  await addColumnIfMissing(client, "find_leads_queue", "found_count", "INTEGER");
 
   // Expression-based unique indexes for dedup
   await client.execute(`

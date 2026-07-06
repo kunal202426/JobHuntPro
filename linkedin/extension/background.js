@@ -391,12 +391,18 @@ async function processPendingFindLeads() {
     const res = await fetchFromBackend("/api/find-leads/pending");
     if (!res || !res.ok) return;
     const request = await res.json().catch(() => null);
-    if (!request || !request.job_id) return;
+    // company is the only hard requirement now — job_id is '' for a direct
+    // "find leads by company" request (no job attached).
+    if (!request || !request.company) return;
 
-    console.log(`[bg] Processing find-leads for job ${request.job_id} (${request.company})`);
+    const desiredCount = Number.isFinite(request.requested_count) && request.requested_count > 0
+      ? request.requested_count
+      : 15;
+
+    console.log(`[bg] Processing find-leads for ${request.job_id ? `job ${request.job_id}` : "company"} (${request.company}), want ${desiredCount}`);
     try {
-      await openLinkedInPeopleSearch(request.company, request.job_id);
-      await patchToBackend(`/api/find-leads/${request.id}/done`, { status: "done" }).catch(() => {});
+      const { profiles } = await openLinkedInPeopleSearch(request.company, request.job_id, desiredCount);
+      await patchToBackend(`/api/find-leads/${request.id}/done`, { status: "done", found_count: profiles.length }).catch(() => {});
     } catch (err) {
       console.error("[bg] Find leads failed:", err.message);
       await patchToBackend(`/api/find-leads/${request.id}/done`, { status: "failed" }).catch(() => {});
@@ -903,8 +909,11 @@ async function runPeopleSearch(query, job_id, company) {
   });
 }
 
-async function openLinkedInPeopleSearch(company, job_id) {
+async function openLinkedInPeopleSearch(company, job_id, desiredCount = 15) {
   if (!(await hasActiveSession())) return { profiles: [] };
+  // fetchJob('') / fetchJob(undefined) already resolves to null — a direct
+  // "find leads by company" request has no job_id, buildLeadQueries falls
+  // back to a generic "software engineer/developer" role query in that case.
   const job = await fetchJob(job_id);
   const jobTitle = job?.title || "";
   const cleanCompany = normalizeText(company || job?.company || "");
@@ -922,21 +931,25 @@ async function openLinkedInPeopleSearch(company, job_id) {
       seen.add(p.profile_url);
       collected.push(p);
     });
-    if (collected.length >= 15) break;
+    if (collected.length >= desiredCount) break;
   }
 
-  if (collected.length > 0) {
+  // A query can return more than the remaining headroom in one batch — trim
+  // to exactly what was asked for rather than over-delivering.
+  const finalProfiles = collected.slice(0, desiredCount);
+
+  if (finalProfiles.length > 0) {
     try {
       await postToBackend("/api/leads/batch", {
-        profiles: collected,
+        profiles: finalProfiles,
         job_id,
         company: cleanCompany,
       });
-      console.log(`[bg] Sent ${collected.length} profiles to backend`);
+      console.log(`[bg] Sent ${finalProfiles.length} profiles to backend`);
     } catch (err) {
       console.error("[bg] Failed to post leads:", err.message);
     }
   }
 
-  return { profiles: collected };
+  return { profiles: finalProfiles };
 }

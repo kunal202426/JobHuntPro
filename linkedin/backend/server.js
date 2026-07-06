@@ -75,6 +75,31 @@ app.post("/api/find-leads", requireAuth, async (req, res) => {
   }
 });
 
+// POST /api/find-leads/company — find leads directly by company name, no job
+// needed. job_id is stored as '' (the column is NOT NULL) so the extension's
+// existing job-based pipeline (openLinkedInPeopleSearch, /api/leads/batch)
+// can treat "no job" as a first-class case instead of a special one.
+app.post("/api/find-leads/company", requireAuth, async (req, res) => {
+  try {
+    const company = String(req.body?.company || "").trim().slice(0, 120);
+    if (!company) return res.status(400).json({ error: "Company name required" });
+
+    let count = parseInt(req.body?.count, 10);
+    if (!Number.isFinite(count) || count <= 0) count = 15;
+    count = Math.min(count, 50);
+
+    const id = uuidv4();
+    await execute(
+      "INSERT INTO find_leads_queue (id, user_id, job_id, company, requested_count) VALUES ($1,$2,$3,$4,$5)",
+      [id, req.userId, "", company, count]
+    );
+    res.status(202).json({ ok: true, request_id: id });
+  } catch (err) {
+    console.error("[find-leads/company/POST] Error:", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // POST /api/find-leads/cancel
 app.post("/api/find-leads/cancel", requireAuth, async (req, res) => {
   try {
@@ -120,10 +145,11 @@ app.get("/api/find-leads/pending", requireAuth, async (req, res) => {
 // PATCH /api/find-leads/:id/done
 app.patch("/api/find-leads/:id/done", requireAuth, async (req, res) => {
   try {
-    const { status = "done" } = req.body;
+    const { status = "done", found_count } = req.body;
+    const foundCountVal = Number.isFinite(found_count) ? found_count : null;
     await execute(
-      "UPDATE find_leads_queue SET status = $1, processed_at = NOW() WHERE id = $2 AND user_id = $3",
-      [status, req.params.id, req.userId]
+      "UPDATE find_leads_queue SET status = $1, found_count = $2, processed_at = NOW() WHERE id = $3 AND user_id = $4",
+      [status, foundCountVal, req.params.id, req.userId]
     );
     res.json({ ok: true });
   } catch (err) {
@@ -136,11 +162,11 @@ app.patch("/api/find-leads/:id/done", requireAuth, async (req, res) => {
 app.get("/api/find-leads/:id/status", requireAuth, async (req, res) => {
   try {
     const row = await getRow(
-      "SELECT status FROM find_leads_queue WHERE id = $1 AND user_id = $2",
+      "SELECT status, requested_count, found_count FROM find_leads_queue WHERE id = $1 AND user_id = $2",
       [req.params.id, req.userId]
     );
     if (!row) return res.status(404).json({ error: "Not found" });
-    res.json({ status: row.status });
+    res.json({ status: row.status, requested_count: row.requested_count, found_count: row.found_count });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
