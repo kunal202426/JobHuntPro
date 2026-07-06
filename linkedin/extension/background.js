@@ -35,9 +35,14 @@ const MAX_DAILY_LIMIT = 100;
 const SESSION_ACTIVE_KEY = "jh_session_active";
 const SCRAPE_SOURCES = {
   linkedin: {
-    // f_TPR=r86400 → past 24h · f_E=1,2,3 → Internship/Entry/Associate only
-    // (no Mid-Senior/Director/Exec) · geoId=102713980 → India · sortBy=DD → newest
-    url: "https://www.linkedin.com/jobs/search/?keywords=Software&f_TPR=r86400&f_E=1%2C2%2C3&geoId=102713980&sortBy=DD",
+    // keywords: boolean OR across the actual role titles we want (quoted phrases,
+    // not a bare "Software" which matched almost anything mentioning the word —
+    // Software Sales, random descriptions, etc.). f_TPR=r86400 → past 24h ·
+    // f_E=1,2,3 → Internship/Entry/Associate only (no Mid-Senior/Director/Exec) ·
+    // f_JT=F,I → Full-time + Internship only (excludes Contract/Part-time/Temp) ·
+    // geoId=102713980 → India · sortBy=DD → newest first, so the truly-fresh
+    // (minutes-old) postings are always at the top of the results.
+    url: "https://www.linkedin.com/jobs/search/?keywords=%22Software%20Engineer%22%20OR%20%22Full%20Stack%20Engineer%22%20OR%20%22Backend%20Engineer%22%20OR%20%22Java%20Full%20Stack%22%20OR%20%22Full%20Stack%20Developer%22%20OR%20%22Backend%20Developer%22&f_TPR=r86400&f_E=1%2C2%2C3&f_JT=F%2CI&geoId=102713980&sortBy=DD",
     hostPrefix: "https://www.linkedin.com/",
     injectFile: "content/linkedin_jobs.js",
   },
