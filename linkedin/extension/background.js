@@ -35,14 +35,17 @@ const MAX_DAILY_LIMIT = 100;
 const SESSION_ACTIVE_KEY = "jh_session_active";
 const SCRAPE_SOURCES = {
   linkedin: {
-    // keywords: boolean OR across the actual role titles we want (quoted phrases,
-    // not a bare "Software" which matched almost anything mentioning the word —
-    // Software Sales, random descriptions, etc.). f_TPR=r86400 → past 24h ·
-    // f_E=1,2,3 → Internship/Entry/Associate only (no Mid-Senior/Director/Exec) ·
-    // f_JT=F,I → Full-time + Internship only (excludes Contract/Part-time/Temp) ·
-    // geoId=102713980 → India · sortBy=DD → newest first, so the truly-fresh
-    // (minutes-old) postings are always at the top of the results.
-    url: "https://www.linkedin.com/jobs/search/?keywords=%22Software%20Engineer%22%20OR%20%22Full%20Stack%20Engineer%22%20OR%20%22Backend%20Engineer%22%20OR%20%22Java%20Full%20Stack%22%20OR%20%22Full%20Stack%20Developer%22%20OR%20%22Backend%20Developer%22&f_TPR=r86400&f_E=1%2C2%2C3&f_JT=F%2CI&geoId=102713980&sortBy=DD",
+    // A single boolean-OR query under-returns compared to running each role
+    // separately — LinkedIn's own search seems to cap/dilute results for
+    // longer OR chains. So instead of one query, we run several SEPARATE
+    // searches back-to-back in the same tab (see LINKEDIN_KEYWORD_QUERIES /
+    // runScrapeTask's linkedin branch below), each a real, undiluted result
+    // page. f_TPR=r86400 → past 24h · f_E=1,2,3 → Internship/Entry/Associate
+    // only (no Mid-Senior/Director/Exec) · f_JT=F,I → Full-time + Internship
+    // only (excludes Contract/Part-time/Temp) · geoId=102713980 → India ·
+    // sortBy=DD → newest first, so the truly-fresh (minutes-old) postings are
+    // always at the top of each search.
+    urls: null, // computed below, once LINKEDIN_KEYWORD_QUERIES is declared
     hostPrefix: "https://www.linkedin.com/",
     injectFile: "content/linkedin_jobs.js",
   },
@@ -85,6 +88,32 @@ const SCRAPE_SOURCES = {
     injectFile: "content/wellfound.js",
   },
 };
+
+// Real, broad-but-still-on-topic title fragments — short enough that LinkedIn's
+// search matches title variants a strict "Software Engineer"-only phrase would
+// miss (Software Developer, SDE, Java Full Stack Developer, etc.), while still
+// staying in the right role family. f_E (Internship/Entry/Associate) and f_JT
+// (Full-time/Internship) do the real precision work at the facet level, so the
+// keyword itself can afford to cast a wider net.
+const LINKEDIN_KEYWORD_QUERIES = [
+  "Software Engineer",
+  "Software Developer",
+  "Full Stack Developer",
+  "Full Stack Engineer",
+  "Backend Developer",
+  "Backend Engineer",
+  "Java Developer",
+  "Java Full Stack",
+  "SDE",
+  "Application Developer",
+];
+
+function buildLinkedinKeywordUrl(keyword) {
+  const encoded = encodeURIComponent(keyword);
+  return `https://www.linkedin.com/jobs/search/?keywords=${encoded}&f_TPR=r86400&f_E=1%2C2%2C3&f_JT=F%2CI&geoId=102713980&sortBy=DD`;
+}
+
+SCRAPE_SOURCES.linkedin.urls = LINKEDIN_KEYWORD_QUERIES.map(buildLinkedinKeywordUrl);
 
 // NEW: Targeted Company Search
 function normalizeCompanyQuery(value) {
@@ -403,35 +432,58 @@ async function runScrapeTask(task) {
   // NEW: Targeted Company Search
   const companyQuery = normalizeCompanyQuery(task.company);
   const companyUrl = companyQuery ? buildCompanySearchUrl(source, companyQuery) : null;
-  const targetUrl = companyUrl || cfg.url;
 
-  const targetTab = await getOrCreateWorkerTab(`scrape_${source}`, targetUrl);
+  // linkedin runs several separate keyword searches back-to-back instead of
+  // one URL (see LINKEDIN_KEYWORD_QUERIES) -- a single combined boolean-OR
+  // query returned noticeably fewer results than each search run on its own.
+  // Targeted company search always overrides with its own single URL.
+  const targetUrls = companyUrl ? [companyUrl] : (cfg.urls && cfg.urls.length ? cfg.urls : [cfg.url]);
+  const iterating = targetUrls.length > 1;
 
-  await waitForTabLoad(targetTab.id);
-  await new Promise(r => setTimeout(r, 1800));
+  const targetTab = await getOrCreateWorkerTab(`scrape_${source}`, targetUrls[0]);
 
-  if (!(await hasActiveSession())) {
-    return { status: "failed", message: "Session inactive" };
+  for (let i = 0; i < targetUrls.length; i++) {
+    if (i > 0) {
+      await chrome.tabs.update(targetTab.id, { url: targetUrls[i] });
+    }
+
+    await waitForTabLoad(targetTab.id);
+    await new Promise(r => setTimeout(r, 1800));
+
+    if (!(await hasActiveSession())) {
+      return { status: "failed", message: "Session inactive" };
+    }
+
+    // Only check for a login wall on the first search -- if we weren't
+    // logged in, every later iteration would fail identically.
+    if (i === 0) {
+      const loginRequired = await detectLoginRequired(targetTab.id, source);
+      if (loginRequired) {
+        return { status: "login_required", message: `Please login on ${source} and click Scrape again.` };
+      }
+    }
+
+    try {
+      await new Promise((resolve) => {
+        chrome.scripting.executeScript(
+          { target: { tabId: targetTab.id }, files: ["content/job_match.js", cfg.injectFile] },
+          () => resolve()
+        );
+      });
+    } catch (err) {
+      return { status: "failed", message: `Failed to start scraper on ${source}` };
+    }
+
+    // Give the content script's own scroll/pagination loop time to run its
+    // course before moving to the next search (or finishing) -- cutting it
+    // off too soon would abandon a still-scrolling page mid-scrape.
+    await new Promise(r => setTimeout(r, iterating ? 28000 : 2500));
   }
 
-  const loginRequired = await detectLoginRequired(targetTab.id, source);
-  if (loginRequired) {
-    return { status: "login_required", message: `Please login on ${source} and click Scrape again.` };
-  }
-
-  try {
-    await new Promise((resolve) => {
-      chrome.scripting.executeScript(
-        { target: { tabId: targetTab.id }, files: ["content/job_match.js", cfg.injectFile] },
-        () => resolve()
-      );
-    });
-  } catch (err) {
-    return { status: "failed", message: `Failed to start scraper on ${source}` };
-  }
-
-  await new Promise(r => setTimeout(r, 2500));
-  return { status: "completed", message: `Scrape triggered for ${source}` };
+  const message = iterating
+    ? `Scrape triggered for ${source} (${targetUrls.length} searches)`
+    : `Scrape triggered for ${source}`;
+  return { status: "completed", message };
 }
 
 async function detectLoginRequired(tabId, source) {
