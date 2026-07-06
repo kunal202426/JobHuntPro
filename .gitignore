@@ -30,3 +30,5 @@ mailed_emails.csv
 # editor/test artifacts
 .playwright-mcp/
 .claude/
+
+.vercel

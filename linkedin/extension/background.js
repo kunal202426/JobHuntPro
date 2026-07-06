@@ -307,29 +307,32 @@ async function processOneConnection() {
   const person = await res.json().catch(() => null);
   if (!person || !person.profile_url) return "no_item";
 
-  const targetTab = await getOrCreateWorkerTab("linkedin_connect", person.profile_url);
-
-  await waitForTabLoad(targetTab.id);
-  await new Promise(r => setTimeout(r, 1200));
-
-  if (!(await hasActiveSession())) return "stopped";
-
-  // Belt-and-suspenders: confirm the tab is still actually showing the
-  // profile we just navigated it to before sending the connect command.
-  // Guards against this same tab getting re-navigated (a stray trigger, a
-  // service-worker restart mid-loop, etc.) in the gap between navigating and
-  // messaging it — the content script re-checks this too, right before its
-  // own irreversible clicks, but catching it here means we never even ask.
-  const targetPath = person.profile_url.replace(/^https?:\/\/[^/]+/, "").split("?")[0].replace(/\/$/, "");
-  const checkTab = await chrome.tabs.get(targetTab.id).catch(() => null);
-  const currentPath = checkTab?.url ? new URL(checkTab.url).pathname.replace(/\/$/, "") : "";
-  if (targetPath && !currentPath.startsWith(targetPath)) {
-    console.warn(`[bg] Tab drifted before DO_CONNECT: expected ${targetPath}, tab is on ${currentPath || "(unknown)"}`);
-    await postToBackend("/api/queue/result", { queue_id: person.id, status: "failed", error_msg: "tab_url_mismatch" }).catch(() => {});
-    return "done";
-  }
+  // A fresh, disposable tab per connection -- NOT a reused one. Reusing one
+  // tab and rapidly re-navigating it between many different profiles back to
+  // back isn't how a real person browses, and confirmed reports show LinkedIn's
+  // own frontend can retain stale "who am I inviting" state across that exact
+  // pattern: the tab visibly displays the correct profile, yet the invite that
+  // goes out is still for someone else. A brand-new tab per attempt, closed
+  // right after, removes any possibility of that carrying over regardless of
+  // the precise mechanism on LinkedIn's side.
+  const targetTab = await chrome.tabs.create({ url: person.profile_url, active: false });
 
   try {
+    await waitForTabLoad(targetTab.id);
+    await new Promise(r => setTimeout(r, 1200));
+
+    if (!(await hasActiveSession())) return "stopped";
+
+    // Confirm the tab is actually showing the profile we just created it with.
+    const targetPath = person.profile_url.replace(/^https?:\/\/[^/]+/, "").split("?")[0].replace(/\/$/, "");
+    const checkTab = await chrome.tabs.get(targetTab.id).catch(() => null);
+    const currentPath = checkTab?.url ? new URL(checkTab.url).pathname.replace(/\/$/, "") : "";
+    if (targetPath && !currentPath.startsWith(targetPath)) {
+      console.warn(`[bg] Tab drifted before DO_CONNECT: expected ${targetPath}, tab is on ${currentPath || "(unknown)"}`);
+      await postToBackend("/api/queue/result", { queue_id: person.id, status: "failed", error_msg: "tab_url_mismatch" }).catch(() => {});
+      return "done";
+    }
+
     const response = await sendMessageToTabWithInjection(targetTab.id, {
       type: "DO_CONNECT",
       payload: { profile_url: person.profile_url, queue_id: person.id }
@@ -358,6 +361,8 @@ async function processOneConnection() {
     }
   } catch (err) {
     console.error('[bg] DO_CONNECT unexpected error:', err?.message || err);
+  } finally {
+    chrome.tabs.remove(targetTab.id).catch(() => {});
   }
 
   return "done";

@@ -554,6 +554,16 @@ async function tryMoreActionsConnect() {
       // the invite modal rather than navigating to the custom-invite href.
       const inner = connectEl.querySelector && connectEl.querySelector('[aria-label*="to connect" i]');
       const btn = inner || connectEl;
+      // If this menu item's label names a person ("Invite <name> to connect"),
+      // it must be the person whose profile we're on — a lingering menu from a
+      // sidebar suggestion card names someone else and gets rejected here.
+      const btnLabel = ((btn.getAttribute && btn.getAttribute("aria-label")) || btn.textContent || "").toLowerCase();
+      if (!labelMatchesProfile(btnLabel, getCurrentProfileName())) {
+        console.warn("[LinkedIn Connect] Menu Connect item names a different person — skipping this menu:", btnLabel.slice(0, 80));
+        closeAnyMenu();
+        await sleep(200);
+        continue;
+      }
       // Real click (opens the invite modal) but cancel the link navigation.
       withNavigationGuard(() => robustClick(btn));
       return { element: btn, followOnly: false };
@@ -605,6 +615,42 @@ function getSendInviteModal() {
   return null;
 }
 
+// FINAL identity gate, checked at the true point of no return: the invite
+// modal itself names its target ("Invite <name> to connect" heading / text).
+// This checks what LinkedIn is actually ABOUT TO DO — not the URL, not which
+// button we think we clicked — so it catches a wrong-person invite no matter
+// which earlier step let it through (stale SPA state, lingering suggestion
+// dropdown, mis-scoped button, anything).
+// Returns true = safe to send, false = modal names someone else, ABORT.
+function inviteModalNamesTargetPerson() {
+  const profileName = getCurrentProfileName();
+  if (!profileName) return true; // can't determine who we're on — don't block
+
+  const modal = getSendInviteModal();
+  if (!modal) return true; // no modal found to inspect — nothing to compare
+
+  const txt = normalizeText(modal.textContent || "").toLowerCase();
+  const m = txt.match(/invite (.+?) to connect/);
+  if (!m) return true; // modal doesn't name anyone — nothing to compare
+
+  const who = m[1].trim();
+  if (who.includes(profileName) || profileName.includes(who)) return true;
+  const pFirst = profileName.split(/\s+/)[0];
+  const wFirst = who.split(/\s+/)[0];
+  if (pFirst && pFirst === wFirst) return true;
+
+  console.warn(`[LinkedIn Connect] Invite modal names "${who}" but profile is "${profileName}" — ABORTING send`);
+  return false;
+}
+
+// Close the invite modal without sending (Dismiss/X, else Escape).
+function dismissInviteModal() {
+  const modal = getSendInviteModal();
+  const close = modal && modal.querySelector('button[aria-label="Dismiss"], [aria-label="Dismiss"], button[aria-label*="close" i]');
+  if (close) { robustClick(close); return; }
+  document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", code: "Escape", keyCode: 27, bubbles: true }));
+}
+
 function hasEmailGate() {
   const dialog = document.querySelector('[role="dialog"], .artdeco-modal');
   if (!dialog || !isElementVisible(dialog)) return false;
@@ -640,7 +686,16 @@ async function handleConnectModal() {
     return "modal_timeout";
   }
 
-  // 2) Click it.
+  // 2) FINAL identity gate before the point of no return: the modal itself
+  //    names who's being invited — if that's not the person whose profile
+  //    we're on, dismiss WITHOUT sending. Whatever went wrong upstream,
+  //    nothing gets sent to the wrong person past this line.
+  if (!inviteModalNamesTargetPerson()) {
+    dismissInviteModal();
+    return "modal_names_wrong_person";
+  }
+
+  //    Click it.
   robustClick(sendBtn);
 
   // 3) Confirm: the "Send without a note" button goes away (LinkedIn closes the
@@ -707,6 +762,13 @@ async function attemptConnect(profile_url) {
   // Case A: a directly-visible Connect button (rare on the new UI).
   const directBtn = findDirectConnectButton();
   if (directBtn) {
+    // Belt-and-suspenders even though this button came from the top-card-
+    // scoped search: if its own label names someone, it must match the
+    // profile we're actually on.
+    const btnLabel = (directBtn.getAttribute("aria-label") || "").toLowerCase();
+    if (!labelMatchesProfile(btnLabel, getCurrentProfileName())) {
+      return { status: "failed", error: "connect_button_name_mismatch" };
+    }
     withNavigationGuard(() => robustClick(directBtn));
   } else {
     // Case B: Connect lives in the "More" dropdown. tryMoreActionsConnect opens
