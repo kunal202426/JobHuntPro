@@ -5,7 +5,7 @@ import { useJobs } from "../../hooks/useJobs";
 import JobCard from "../cards/JobCard";
 import EmptyState from "../shared/EmptyState";
 
-const SOURCES = ["all", "naukri", "linkedin", "cutshort", "instahyre", "hiringcafe", "wellfound"];
+const SOURCES = ["all", "naukri", "linkedin", "cutshort", "instahyre", "hiringcafe", "wellfound", "indeed", "apna"];
 
 const DATE_FILTERS = [
   { value: "all",       label: "All Time"  },
@@ -389,6 +389,8 @@ export default function FreshJobsPortal() {
                 <option value="instahyre">Instahyre</option>
                 <option value="hiringcafe">Hiring Cafe</option>
                 <option value="wellfound">Wellfound</option>
+                <option value="indeed">Indeed</option>
+                <option value="apna">Apna</option>
                 <option value="all">All portals</option>
               </select>
 
@@ -430,6 +432,7 @@ export default function FreshJobsPortal() {
                 <option value="instahyre">Instahyre</option>
                 <option value="hiringcafe">Hiring Cafe</option>
                 <option value="wellfound">Wellfound</option>
+                <option value="indeed">Indeed</option>
               </select>
               <button
                 onClick={triggerCompanyScrape}

@@ -21,6 +21,8 @@ const SOURCE_LABELS = {
   instahyre:  "Instahyre",
   hiringcafe: "HiringCafe",
   wellfound:  "Wellfound",
+  indeed:     "Indeed",
+  apna:       "Apna",
 };
 
 const STATUS_ACCENT = {

@@ -87,6 +87,31 @@ const SCRAPE_SOURCES = {
     hostPrefix: "https://wellfound.com/",
     injectFile: "content/wellfound.js",
   },
+  indeed: {
+    // Same multi-keyword iteration as LinkedIn, same reason: one combined
+    // query under-returns vs. running each title separately. fromage=1 → past
+    // 24h · explvl=entry_level → entry-level classification · jt=fulltime →
+    // full-time only · sort=date → newest first. in.indeed.com specifically
+    // (indeed.com alone redirects to the US site and ignores l=India).
+    urls: null, // computed below, once INDEED_KEYWORD_QUERIES is declared
+    hostPrefix: "https://in.indeed.com/",
+    injectFile: "content/indeed.js",
+  },
+  apna: {
+    // Apna's "Date posted" filter is pure client-side React state — the URL
+    // never changes when you apply it (confirmed) — so there's no way to
+    // deep-link into a filtered search. The content script drives the "Last
+    // 24 hours" radio itself after load. Only two category slugs confirmed to
+    // actually scope results server-side (most guessed slugs silently fall
+    // back to the entire unfiltered job feed instead of erroring) — more can
+    // be added once verified the same way.
+    urls: [
+      "https://apna.co/jobs/software-engineer-jobs",
+      "https://apna.co/jobs/java-developer-jobs",
+    ],
+    hostPrefix: "https://apna.co/",
+    injectFile: "content/apna.js",
+  },
 };
 
 // Real, broad-but-still-on-topic title fragments — short enough that LinkedIn's
@@ -114,6 +139,24 @@ function buildLinkedinKeywordUrl(keyword) {
 }
 
 SCRAPE_SOURCES.linkedin.urls = LINKEDIN_KEYWORD_QUERIES.map(buildLinkedinKeywordUrl);
+
+// Same rationale as LINKEDIN_KEYWORD_QUERIES — short/broad titles instead of
+// one long combined query.
+const INDEED_KEYWORD_QUERIES = [
+  "software engineer",
+  "software developer",
+  "full stack developer",
+  "backend developer",
+  "java developer",
+  "sde",
+];
+
+function buildIndeedKeywordUrl(keyword) {
+  const encoded = encodeURIComponent(keyword);
+  return `https://in.indeed.com/jobs?q=${encoded}&l=India&fromage=1&explvl=entry_level&jt=fulltime&sort=date`;
+}
+
+SCRAPE_SOURCES.indeed.urls = INDEED_KEYWORD_QUERIES.map(buildIndeedKeywordUrl);
 
 // NEW: Targeted Company Search
 function normalizeCompanyQuery(value) {
@@ -154,6 +197,13 @@ function buildCompanySearchUrl(source, company) {
     });
     return `https://hiring.cafe/?searchState=${encodeURIComponent(state)}`;
   }
+  if (source === "indeed") {
+    return `https://in.indeed.com/jobs?q=${encoded}&l=India&fromage=1&explvl=entry_level&jt=fulltime&sort=date`;
+  }
+  // Apna has no keyword search that reliably scopes results (confirmed via
+  // testing — most guessed URL/query patterns silently fall back to the
+  // entire unfiltered feed), so there's no reliable way to target a specific
+  // company there. Omitted from company search.
   return null;
 }
 
