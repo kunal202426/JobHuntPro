@@ -3,6 +3,7 @@
   "name": "JobHunt Engine",
   "version": "1.0.0",
   "description": "Job hunt automation tool",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAv0ECvtxz7a0nUExK3Gn/pzVfeHhq40CcevXOf1dZwFcazgmL6PQVH1B+X63qlbuGdgDlxz8CnW5lXpHUVljogLxGrJrAvmmg15WRQOnt5LeFuY7PQ/W80jkUf/KCNPMtGb8E/DPevIoq4UraWucuaRNXi5hnfVhkWIxnavhs0YlL+CMnqW5qU6ntbAftj+ACI5jBsjw9+gBKA9EcIQlIzIKGC9ZtdlgHWWDskzpMiAumnWdx1jVoSZLIv1gIAD0GP+oDDaFgFaCOksMJB0rslClRdC1gDbyYKiUPga7+y3VY6slTVbwc/1oOiHoj7X71hgGzIsHv/dOy09Mo/HD5TwIDAQAB",
   "permissions": [
     "activeTab",
     "scripting",
