@@ -61,6 +61,7 @@ class ProfileUpdate(BaseModel):
     phone: Optional[str] = None
     portfolio_url: Optional[str] = None
     linkedin_url: Optional[str] = None
+    college: Optional[str] = None
     current_role: Optional[str] = None
     current_company: Optional[str] = None
     graduation_month_year: Optional[str] = None
@@ -147,6 +148,7 @@ def get_profile(current_user: User = Depends(get_current_user)):
         "phone": current_user.phone or "",
         "portfolio_url": current_user.portfolio_url or "",
         "linkedin_url": current_user.linkedin_url or "",
+        "college": current_user.college or "",
         "current_role": current_user.current_role or "",
         "current_company": current_user.current_company or "",
         "graduation_month_year": current_user.graduation_month_year or "",
@@ -200,6 +202,8 @@ def update_profile(data: ProfileUpdate, current_user: User = Depends(get_current
         current_user.portfolio_url = data.portfolio_url
     if data.linkedin_url is not None:
         current_user.linkedin_url = data.linkedin_url
+    if data.college is not None:
+        current_user.college = data.college
     if data.current_role is not None:
         current_user.current_role = data.current_role
     if data.current_company is not None:

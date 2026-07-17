@@ -89,6 +89,7 @@ def process_queue(db: Session = Depends(get_db), current_user: User = Depends(ge
                     "phone": current_user.phone or "",
                     "portfolio_url": current_user.portfolio_url or "",
                     "linkedin_url": current_user.linkedin_url or "",
+                    "college": current_user.college or "",
                     "current_role": current_user.current_role or "",
                     "current_company": current_user.current_company or "",
                     "graduation_month_year": current_user.graduation_month_year or "",

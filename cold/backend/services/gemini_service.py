@@ -142,13 +142,32 @@ def _call_gemini(system_prompt: str, prompt: str, api_key: str, max_tokens: int 
 
 # ── User profile → prompt strings ────────────────────────────────────────────
 
+def _describe_identity(u: dict) -> str:
+    """A natural, ready-to-use identity clause for the email intro ("I'm X,
+    ___") — adapts to whether the sender currently has a job/internship or is
+    still a student/fresher, instead of fabricating a fake "currently working
+    in tech at their company" for someone who has filled in neither field.
+    Also role-agnostic: doesn't assume a tech job title."""
+    current_role = (u.get("current_role") or "").strip()
+    current_co   = (u.get("current_company") or "").strip()
+    college      = (u.get("college") or "").strip()
+    grad         = (u.get("graduation_month_year") or "").strip()
+
+    if current_role:
+        return f"currently working as {current_role}" + (f" at {current_co}" if current_co else "")
+    if college and grad:
+        return f"a student at {college}, graduating {grad}"
+    if college:
+        return f"a student at {college}"
+    return ""  # nothing reliable to say — the LLM should introduce the sender plainly
+
+
 def _build_background(u: dict) -> str:
     name          = u.get("full_name") or "the sender"
-    current_role  = u.get("current_role") or "currently working in tech"
-    current_co    = u.get("current_company") or ""
-    college       = u.get("college") or u.get("current_role") or ""
+    identity      = _describe_identity(u)
+    college       = (u.get("college") or "").strip()
     grad          = u.get("graduation_month_year") or ""
-    target        = u.get("target_role") or "full-time roles"
+    target        = u.get("target_role") or "relevant full-time roles"
     background    = u.get("background_text") or ""
     projects_raw  = u.get("projects") or []
 
@@ -161,9 +180,8 @@ def _build_background(u: dict) -> str:
     parts = [f"SENDER'S BACKGROUND:\n{name}"]
     if college:
         parts.append(f"Education: {college}")
-    if current_role:
-        company_str = f" at {current_co}" if current_co else ""
-        parts.append(f"Current role: {current_role}{company_str}")
+    if identity:
+        parts.append(f"Current status: {identity}")
     if grad:
         parts.append(f"Available for {target} from {grad}")
     if background:
@@ -212,12 +230,16 @@ def _build_cold_signal(u: dict) -> str:
 
 def _cold_outreach_prompt(u: dict) -> str:
     name        = u.get("full_name") or "the sender"
-    current_role = u.get("current_role") or "working in tech"
-    current_co  = u.get("current_company") or "their company"
-    grad        = u.get("graduation_month_year") or "soon"
-    target      = u.get("target_role") or "full-time roles"
+    identity    = _describe_identity(u)
+    grad        = u.get("graduation_month_year") or ""
+    target      = u.get("target_role") or "relevant full-time roles"
     signal      = _build_cold_signal(u)
     background  = _build_background(u)
+
+    if identity:
+        intro_pattern = f'"I\'m {name}, {identity}. I\'m looking for {target}' + (f" starting {grad}" if grad else "") + ' and came across [Company]."'
+    else:
+        intro_pattern = f'"I\'m {name}. I\'m looking for {target}' + (f" starting {grad}" if grad else "") + ' and came across [Company]."'
 
     return f"""ABSOLUTE LIMIT: The email body must be 90-130 words.
 Count before outputting. If it exceeds 130 words, CUT IT.
@@ -233,7 +255,10 @@ Use THAT name. Never use "{name}" as the greeting — {name} is the sender, not 
 If no name is given, write: Hi there,
 
 SUBJECT LINE:
-Format: "SDE roles at [Company Name]" OR "Application at [Company Name]".
+Format: "Application at [Company Name]" (default). If the sender's target role
+above names a specific field, you may use "{target} at [Company Name]" instead.
+Never default to a specific job title (e.g. "SDE") unless the sender's own
+target role says so — many senders are not software engineers.
 
 TONE: warm, humble, and conversational — like a real person reaching out, not a
 formal job application. Use plain, friendly language. Avoid corporate buzzwords,
@@ -241,15 +266,18 @@ formal job application. Use plain, friendly language. Avoid corporate buzzwords,
 
 STRUCTURE (2 short paragraphs only):
 Paragraph 1 — INTRO:
-    1-2 sentences, natural and warm. Pattern: "I'm {name}, currently working as
-    {current_role} at {current_co}. I'm looking for {target} starting {grad} and
-    came across [Company]." (rephrase naturally; don't sound robotic).
+    1-2 sentences, natural and warm. Pattern: {intro_pattern} (rephrase
+    naturally; don't sound robotic). If no identity/status is given above,
+    just introduce {name} plainly without inventing a job, employer, or school.
 
 Paragraph 2 — WHY FIT:
-    1-2 sentences. Warmly say what you like about what [Company] builds (their
-    domain/product), then: "I believe my experience with [list 2-4 concrete
-    skills/tech drawn from background/projects, e.g. React, Node.js, ML-powered
-    apps, distributed systems] would be a good fit." Keep it genuine and modest.
+    1-2 sentences. Warmly say what you like about what [Company] builds or does
+    (their domain), then: "I believe my [2-4 concrete skills/strengths drawn
+    ONLY from the background/projects given above] would be a good fit." Do
+    NOT invent skills, and do NOT default to software-engineering examples
+    (React, distributed systems, etc.) unless the sender's own background says
+    so — infer the right kind of strengths to mention from their actual field.
+    Keep it genuine and modest.
 
 HARD RULES:
 - 70-110 words body MAX (excluding signal) — keep it short and easy to read
@@ -264,13 +292,16 @@ SIGNAL FORMAT (exact, append after body):
 
 def _referral_work_prompt(u: dict) -> str:
     name       = u.get("full_name") or "the sender"
-    current_co = u.get("current_company") or "their current company"
     signal     = _build_signal(u)
     background = _build_background(u)
 
     return f"""ABSOLUTE LIMIT: Email body must be 80-120 words.
 
-You write referral-ask emails for {name} targeting engineering managers or tech leads.
+You write referral-ask emails for {name} targeting managers or leads in {name}'s
+own field — infer the right kind of decision-maker (e.g. engineering
+manager/tech lead for a software background, or the equivalent for whatever
+field the sender's background above actually describes; don't assume
+software engineering unless it says so).
 {name} is the SENDER. THIS IS NOT A COLD EMAIL — peer-to-peer outreach referencing specific work they published.
 {background}
 
@@ -330,22 +361,22 @@ SIGNAL FORMAT (exact):
 
 
 def _linkedin_referral_prompt(u: dict) -> str:
-    name   = u.get("full_name") or "the sender"
-    port   = u.get("portfolio_url") or ""
-    role   = u.get("current_role") or "working in tech"
+    name     = u.get("full_name") or "the sender"
+    port     = u.get("portfolio_url") or ""
+    identity = _describe_identity(u)
 
     return f"""ABSOLUTE LIMIT: Email body must be 60-90 words. Count before outputting. If over 90, CUT IT.
 
 You write LinkedIn referral ask emails for {name}.
 {name} is the SENDER. The recipient is someone they found on LinkedIn.
-{name}: {role}
+{name}: {identity or "no current role/school given — introduce them plainly, don't invent one"}
 Portfolio: {port}
 
 SUBJECT LINE: "Reaching out — [Company Name]"
 
 STRUCTURE (use \\n\\n between paragraphs):
 Para 1: "Hi [name]\\n\\n" then exactly one sentence about how they were found on LinkedIn.
-Para 2: Start with "I'm {name}, currently {role}." Then one sentence about experience and interest in the company.
+Para 2: Start with "I'm {name}{f', {identity}' if identity else ''}." Then one sentence about experience and interest in the company.
 Para 3 — output EXACTLY:
 "You can check out my work and portfolio here:\\n{port}\\n\\nI'd be happy to share my resume or discuss my experience further if required.\\n\\nThank you.\\n~{name}"
 

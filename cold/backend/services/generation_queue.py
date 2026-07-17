@@ -152,6 +152,7 @@ def _process_gen_queue():
                     "phone": user_row.phone or "",
                     "portfolio_url": user_row.portfolio_url or "",
                     "linkedin_url": user_row.linkedin_url or "",
+                    "college": user_row.college or "",
                     "current_role": user_row.current_role or "",
                     "current_company": user_row.current_company or "",
                     "graduation_month_year": user_row.graduation_month_year or "",

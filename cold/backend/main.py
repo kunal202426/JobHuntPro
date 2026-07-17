@@ -46,6 +46,7 @@ def _run_migrations():
         ("phone", "TEXT"),
         ("portfolio_url", "TEXT"),
         ("linkedin_url", "TEXT"),
+        ("college", "TEXT"),
         ("current_role", "TEXT"),
         ("current_company", "TEXT"),
         ("graduation_month_year", "TEXT"),

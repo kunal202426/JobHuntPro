@@ -137,6 +137,7 @@ export default function SettingsPage() {
             phone: data.phone || '',
             portfolio_url: data.portfolio_url || '',
             linkedin_url: data.linkedin_url || '',
+            college: data.college || '',
             current_role: data.current_role || '',
             current_company: data.current_company || '',
             graduation_month_year: data.graduation_month_year || '',
@@ -153,7 +154,9 @@ export default function SettingsPage() {
         if (matchProfile) {
           setForm(f => ({
             ...f,
-            college: matchProfile.college || '',
+            // Cold backend's own college value (set above) wins if present —
+            // only fall back to the linkedin-match copy when cold has none.
+            college: f.college || matchProfile.college || '',
             location: matchProfile.location || '',
             experience_years: matchProfile.experience_years != null ? String(matchProfile.experience_years) : '',
             target_keywords: Array.isArray(matchProfile.target_keywords) ? matchProfile.target_keywords.join(', ') : '',
@@ -197,6 +200,7 @@ export default function SettingsPage() {
         phone: form.phone.trim(),
         portfolio_url: form.portfolio_url.trim(),
         linkedin_url: form.linkedin_url.trim(),
+        college: form.college.trim(),
         gmail_address: form.gmail_address.trim(),
         current_role: form.current_role.trim(),
         current_company: form.current_company.trim(),

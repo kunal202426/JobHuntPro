@@ -26,6 +26,7 @@ class User(Base):
     phone                = Column(Text)
     portfolio_url        = Column(Text)
     linkedin_url         = Column(Text)
+    college              = Column(Text)   # e.g. "IIT Bombay" — distinct from current_role
     current_role         = Column(Text)   # e.g. "Full Stack Dev Intern at YES Bank"
     current_company      = Column(Text)   # e.g. "YES Bank"
     graduation_month_year = Column(Text)  # e.g. "July 2026"
