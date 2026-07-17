@@ -123,15 +123,6 @@ export async function initDB() {
   `);
 
   await client.execute(`
-    CREATE TABLE IF NOT EXISTS gemini_key_stats (
-      key_index INTEGER PRIMARY KEY,
-      call_count INTEGER DEFAULT 0,
-      last_429_at TEXT,
-      total_tokens_approx INTEGER DEFAULT 0
-    )
-  `);
-
-  await client.execute(`
     CREATE TABLE IF NOT EXISTS find_leads_queue (
       id TEXT PRIMARY KEY,
       user_id TEXT NOT NULL,
@@ -198,6 +189,16 @@ export async function initDB() {
   // as '' (empty string) for these rows since the column is NOT NULL.
   await addColumnIfMissing(client, "find_leads_queue", "requested_count", "INTEGER");
   await addColumnIfMissing(client, "find_leads_queue", "found_count", "INTEGER");
+
+  // Profile fields that drive job matching/scoring (auditor.js) and the
+  // extension's own search-URL + keyword-filter construction (background.js).
+  // Distinct from cold/backend's profile (used for email drafting) — this
+  // backend can't reach that DB, so it keeps its own copy of the subset it needs.
+  await addColumnIfMissing(client, "users", "college", "TEXT");
+  await addColumnIfMissing(client, "users", "location", "TEXT");
+  await addColumnIfMissing(client, "users", "skills", "TEXT");
+  await addColumnIfMissing(client, "users", "experience_years", "INTEGER");
+  await addColumnIfMissing(client, "users", "target_keywords", "TEXT");
 
   // Expression-based unique indexes for dedup
   await client.execute(`

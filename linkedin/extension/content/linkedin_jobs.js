@@ -7,79 +7,12 @@
   }
   window.__jobHuntLinkedInJobsInitialized = true;
 
-const TECH_KEYWORDS = [
+// Fallback keyword list used only when the user hasn't set their own
+// skills/target-keywords in Settings — see job_match.js's getResumeKeywords.
+const DEFAULT_TECH_KEYWORDS = [
   "software", "developer", "engineer", "sde", "backend", "frontend",
   "full stack", "fullstack", "python", "react", "node", "ml",
   "machine learning", "ai", "data engineer", "fintech",
-];
-
-// Add your resume keywords to tighten matching (falls back to TECH_KEYWORDS if empty)
-const RESUME_KEYWORDS = [
-  "software engineer",
-  "software developer",
-  "full stack",
-  "backend",
-  "frontend",
-  "react",
-  "node",
-  "express",
-  "fastapi",
-  "python",
-  "javascript",
-  "postgresql",
-  "mongodb",
-  "firebase",
-  "rest",
-  "rest api",
-  "microservices",
-  "websocket",
-  "aws",
-  "ci/cd",
-  "distributed systems",
-  "system design",
-  "machine learning",
-  "ml",
-  "tensorflow",
-  "scikit-learn",
-  "computer vision",
-  "nlp",
-  "etl",
-  "lstm",
-  "lightgbm",
-  "blockchain",
-  "solidity",
-  "web3",
-  "ethereum",
-  "dapp",
-  "hyperledger",
-  "three.js",
-  "reactflow",
-];
-
-const EXCLUDE_TITLE_PATTERNS = [
-  /\bsenior\b/i,
-  /\bsr\.?\b/i,
-  /\blead\b/i,
-  /\bprincipal\b/i,
-  /\bstaff\b/i,
-  /\barchitect\b/i,
-  /\bmanager\b/i,
-  /\bdirector\b/i,
-  /\bhead\b/i,
-  /\bvp\b/i,
-  /vice president/i,
-  /\bchief\b/i,
-  /\bcto\b/i,
-  /\bcio\b/i,
-  /\bcpo\b/i,
-  /\bfounder\b/i,
-  /\bco[-\s]?founder\b/i,
-  // Numbered senior levels — SDE 2/3, SDE II/III, Engineer II, Developer 3, Level 3, etc.
-  // (SDE 1 / SDE I / unnumbered stay, since those are junior-friendly.)
-  /\b(sde|swe|sse|mts)[-\s]?(2|3|4|5|ii|iii|iv|v)\b/i,
-  /\b(software\s+|backend\s+|frontend\s+|full[-\s]?stack\s+)?(engineer|developer|programmer)[-\s]+(2|3|4|5|ii|iii|iv|v)\b/i,
-  /\blevel[-\s]?(2|3|4|5)\b/i,
-  /\bgrade[-\s]?(2|3|4|5)\b/i,
 ];
 
 function normalizeText(text) {
@@ -87,17 +20,15 @@ function normalizeText(text) {
 }
 
 function matchesKeywords(text) {
-  return [...RESUME_KEYWORDS, ...TECH_KEYWORDS].some(kw => text.includes(kw));
-}
-
-function isSeniorTitle(title) {
-  return EXCLUDE_TITLE_PATTERNS.some(re => re.test(title));
+  const keywords = window.__jhJobFilter
+    ? window.__jhJobFilter.getResumeKeywords(DEFAULT_TECH_KEYWORDS)
+    : DEFAULT_TECH_KEYWORDS;
+  return keywords.some(kw => text.includes(kw));
 }
 
 function isRelevant(title) {
   const lower = normalizeText(title);
   if (window.__jhJobFilter && window.__jhJobFilter.isExcludedTitle(title)) return false;
-  if (isSeniorTitle(lower)) return false;
   return matchesKeywords(lower);
 }
 

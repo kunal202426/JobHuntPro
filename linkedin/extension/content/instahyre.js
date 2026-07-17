@@ -7,27 +7,13 @@
   }
   window.__jobHuntInstahyreInitialized = true;
 
-  const TECH_KEYWORDS = [
+  // Fallback keyword list used only when the user hasn't set their own
+  // skills/target-keywords in Settings — see job_match.js's getResumeKeywords.
+  const DEFAULT_TECH_KEYWORDS = [
     "software", "developer", "engineer", "sde", "backend", "frontend",
     "full stack", "fullstack", "python", "react", "node", "ml",
     "machine learning", "ai", "data engineer", "fintech",
   ];
-
-  // Senior / too-experienced titles to skip (Sr., Senior, Lead, III, SDE 2/3, …)
-  const EXCLUDE_TITLE_PATTERNS = [
-    /\bsenior\b/i, /\bsr\.?\b/i, /\blead\b/i, /\bprincipal\b/i, /\bstaff\b/i,
-    /\barchitect\b/i, /\bmanager\b/i, /\bdirector\b/i, /\bhead\b/i, /\bvp\b/i,
-    /vice president/i, /\bchief\b/i, /\bcto\b/i, /\bfounder\b/i,
-    /\biii\b/i, /\biv\b/i,
-    /\b(sde|swe|sse|mts)[-\s]?(2|3|4|5|ii|iii|iv|v)\b/i,
-    /\b(software\s+|backend\s+|frontend\s+|full[-\s]?stack\s+)?(engineer|developer|programmer)[-\s]+(2|3|4|5|ii|iii|iv|v)\b/i,
-    /\blevel[-\s]?(2|3|4|5)\b/i,
-  ];
-
-  function isSeniorTitle(title) {
-    return EXCLUDE_TITLE_PATTERNS.some((re) => re.test(title || ""));
-  }
-
 
   const seenUrls = new Set();
   const pendingJobs = [];
@@ -60,8 +46,10 @@
   function isRelevant(title) {
     const lower = (title || "").toLowerCase();
     if (window.__jhJobFilter && window.__jhJobFilter.isExcludedTitle(title)) return false;
-    if (isSeniorTitle(lower)) return false;
-    return TECH_KEYWORDS.some((kw) => lower.includes(kw));
+    const keywords = window.__jhJobFilter
+      ? window.__jhJobFilter.getResumeKeywords(DEFAULT_TECH_KEYWORDS)
+      : DEFAULT_TECH_KEYWORDS;
+    return keywords.some((kw) => lower.includes(kw));
   }
 
   function parsePostedAt(text) {
@@ -505,7 +493,13 @@
   // Engineering" + "All - Data Science and Analysis" job functions, set
   // Experience (years) = 0, then click Show results.
   const JOB_FUNCTION_VALUES = ["/api/v1/job_category/1", "/api/v1/job_category/8"];
-  const TARGET_YEARS = "0";
+  // Instahyre's "Experience (years)" field expects the CANDIDATE'S OWN years
+  // of experience, not a cap on the job — sourced from the user's profile so
+  // it isn't hardcoded to a fresh grad (defaults to 0 if no profile is set).
+  function getTargetYears() {
+    const y = window.__jhProfile?.experienceYears;
+    return Number.isFinite(y) ? String(Math.max(0, Math.round(y))) : "0";
+  }
 
   // "Software Engineering" (job_category/1) has no clickable "All -" .option row
   // of its own in the dropdown — unlike every other group (Data Science, IT Ops,
@@ -628,7 +622,8 @@
         return false;
       }
 
-      setYearsInput(TARGET_YEARS);
+      const targetYears = getTargetYears();
+      setYearsInput(targetYears);
       await sleep(300);
 
       const showBtn = document.getElementById("show-results");
@@ -638,7 +633,7 @@
       }
 
       showBtn.click();
-      console.log("[Instahyre] Search filters applied: Software Engineering + Data Science, 0 years");
+      console.log(`[Instahyre] Search filters applied: Software Engineering + Data Science, ${targetYears} years`);
       await sleep(2500); // let the search results render
       return true;
     } catch (err) {

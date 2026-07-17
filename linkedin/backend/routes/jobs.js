@@ -6,7 +6,7 @@ import { filterDuplicates } from "../services/dedup.js";
 
 const router = Router();
 
-const TECH_KEYWORDS = [
+const DEFAULT_TECH_KEYWORDS = [
   "software", "developer", "engineer", "sde", "backend", "frontend",
   "full stack", "fullstack", "python", "react", "node", "ml",
   "machine learning", "ai", "data engineer", "data scientist",
@@ -14,9 +14,24 @@ const TECH_KEYWORDS = [
   "typescript", "java", "rust", "fintech",
 ];
 
-function isRelevantTitle(title) {
+function parseKeywordList(csv) {
+  return String(csv || "").split(/[,;\n]/).map(s => s.toLowerCase().trim()).filter(Boolean);
+}
+
+async function getMatchProfile(userId) {
+  const row = await getRow("SELECT target_keywords, skills, experience_years FROM users WHERE id = $1", [userId]);
+  return {
+    target_keywords: row?.target_keywords || "",
+    skills: row?.skills || "",
+    experience_years: Number.isFinite(row?.experience_years) ? row.experience_years : null,
+  };
+}
+
+function isRelevantTitle(title, profile) {
   const lower = (title || "").toLowerCase();
-  return TECH_KEYWORDS.some(kw => lower.includes(kw));
+  const userKeywords = [...parseKeywordList(profile?.target_keywords), ...parseKeywordList(profile?.skills)];
+  const keywords = userKeywords.length ? userKeywords : DEFAULT_TECH_KEYWORDS;
+  return keywords.some(kw => lower.includes(kw));
 }
 
 function safeInt(value, fallback = null) {
@@ -97,7 +112,8 @@ router.post("/batch", async (req, res) => {
     return res.json({ saved: 0, rejected: 0, duplicates: 0 });
   }
 
-  const relevant = rawJobs.filter(j => isRelevantTitle(j.title));
+  const profile = await getMatchProfile(uid);
+  const relevant = rawJobs.filter(j => isRelevantTitle(j.title, profile));
   const withIds = relevant.map((j, i) => ({ ...j, temp_id: `tmp_${i}` }));
   const newJobs = await filterDuplicates(withIds, uid);
   const duplicates = rawJobs.length - newJobs.length;
@@ -106,8 +122,8 @@ router.post("/batch", async (req, res) => {
 
   let scoredMap = {};
   try {
-    // Rule-based scoring — synchronous, no AI, no user profile needed.
-    const scored = await auditJobs(newJobs);
+    // Rule-based scoring — synchronous, no AI — driven by this user's profile.
+    const scored = await auditJobs(newJobs, profile);
     scored.forEach(s => { scoredMap[s.temp_id] = s; });
   } catch (err) {
     console.error("[Jobs/batch] Auditor error:", err.message);

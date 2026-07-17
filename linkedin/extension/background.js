@@ -114,13 +114,14 @@ const SCRAPE_SOURCES = {
   },
 };
 
-// Real, broad-but-still-on-topic title fragments — short enough that LinkedIn's
-// search matches title variants a strict "Software Engineer"-only phrase would
-// miss (Software Developer, SDE, Java Full Stack Developer, etc.), while still
-// staying in the right role family. f_E (Internship/Entry/Associate) and f_JT
-// (Full-time/Internship) do the real precision work at the facet level, so the
-// keyword itself can afford to cast a wider net.
-const LINKEDIN_KEYWORD_QUERIES = [
+// Default, broad-but-still-on-topic title fragments — used only when the
+// user hasn't set their own target keywords in Settings. Short enough that
+// LinkedIn's search matches title variants a strict "Software Engineer"-only
+// phrase would miss (Software Developer, SDE, Java Full Stack Developer,
+// etc.), while still staying in the right role family. f_E (Internship/Entry/
+// Associate) and f_JT (Full-time/Internship) do the real precision work at
+// the facet level, so the keyword itself can afford to cast a wider net.
+const DEFAULT_LINKEDIN_KEYWORD_QUERIES = [
   "Software Engineer",
   "Software Developer",
   "Full Stack Developer",
@@ -133,16 +134,22 @@ const LINKEDIN_KEYWORD_QUERIES = [
   "Application Developer",
 ];
 
-function buildLinkedinKeywordUrl(keyword) {
+// geoId=102713980 (India) is only used as the fallback when the user hasn't
+// set a location in their profile — LinkedIn also accepts a free-text
+// `location=` param, which resolves best-effort for any other place.
+const DEFAULT_GEO_ID = "102713980";
+
+function buildLinkedinKeywordUrl(keyword, location) {
   const encoded = encodeURIComponent(keyword);
-  return `https://www.linkedin.com/jobs/search/?keywords=${encoded}&f_TPR=r86400&f_E=1%2C2%2C3&f_JT=F%2CI&geoId=102713980&sortBy=DD`;
+  const geoParam = location ? `location=${encodeURIComponent(location)}` : `geoId=${DEFAULT_GEO_ID}`;
+  return `https://www.linkedin.com/jobs/search/?keywords=${encoded}&f_TPR=r86400&f_E=1%2C2%2C3&f_JT=F%2CI&${geoParam}&sortBy=DD`;
 }
 
-SCRAPE_SOURCES.linkedin.urls = LINKEDIN_KEYWORD_QUERIES.map(buildLinkedinKeywordUrl);
+SCRAPE_SOURCES.linkedin.urls = DEFAULT_LINKEDIN_KEYWORD_QUERIES.map((k) => buildLinkedinKeywordUrl(k, null));
 
-// Same rationale as LINKEDIN_KEYWORD_QUERIES — short/broad titles instead of
-// one long combined query.
-const INDEED_KEYWORD_QUERIES = [
+// Same rationale as DEFAULT_LINKEDIN_KEYWORD_QUERIES — short/broad titles
+// instead of one long combined query, used only without a user profile.
+const DEFAULT_INDEED_KEYWORD_QUERIES = [
   "software engineer",
   "software developer",
   "full stack developer",
@@ -151,12 +158,52 @@ const INDEED_KEYWORD_QUERIES = [
   "sde",
 ];
 
-function buildIndeedKeywordUrl(keyword) {
+function buildIndeedKeywordUrl(keyword, location) {
   const encoded = encodeURIComponent(keyword);
-  return `https://in.indeed.com/jobs?q=${encoded}&l=India&fromage=1&explvl=entry_level&jt=fulltime&sort=date`;
+  const l = encodeURIComponent(location || "India");
+  return `https://in.indeed.com/jobs?q=${encoded}&l=${l}&fromage=1&explvl=entry_level&jt=fulltime&sort=date`;
 }
 
-SCRAPE_SOURCES.indeed.urls = INDEED_KEYWORD_QUERIES.map(buildIndeedKeywordUrl);
+SCRAPE_SOURCES.indeed.urls = DEFAULT_INDEED_KEYWORD_QUERIES.map((k) => buildIndeedKeywordUrl(k, null));
+
+// Only two Apna category slugs are confirmed to actually scope results
+// server-side (most guessed slugs silently fall back to the entire
+// unfiltered feed instead of erroring — see content/apna.js). Best-effort
+// pick between them from the user's own target keywords; more slugs can be
+// added here once verified live the same way.
+const APNA_CATEGORY_SLUGS = {
+  java: "https://apna.co/jobs/java-developer-jobs",
+  default: "https://apna.co/jobs/software-engineer-jobs",
+};
+
+function buildApnaUrls(targetKeywords) {
+  const lower = (targetKeywords || []).map((k) => k.toLowerCase());
+  const urls = [APNA_CATEGORY_SLUGS.default];
+  if (lower.some((k) => k.includes("java"))) urls.push(APNA_CATEGORY_SLUGS.java);
+  return urls;
+}
+
+// Fetches the logged-in user's job-matching profile (skills, target
+// keywords, experience, location) so search URLs and in-page keyword/
+// experience filters adapt to whoever is actually using the extension
+// instead of one hardcoded resume. Falls back to nulls/empty on any failure
+// so scraping still runs with the original defaults.
+async function getUserProfile() {
+  try {
+    const res = await fetchFromBackend("/api/account/profile");
+    if (!res || !res.ok) return { skills: [], targetKeywords: [], experienceYears: null, location: "" };
+    const data = await res.json().catch(() => null);
+    if (!data) return { skills: [], targetKeywords: [], experienceYears: null, location: "" };
+    return {
+      skills: Array.isArray(data.skills) ? data.skills : [],
+      targetKeywords: Array.isArray(data.target_keywords) ? data.target_keywords : [],
+      experienceYears: Number.isFinite(data.experience_years) ? data.experience_years : null,
+      location: data.location || "",
+    };
+  } catch {
+    return { skills: [], targetKeywords: [], experienceYears: null, location: "" };
+  }
+}
 
 // NEW: Targeted Company Search
 function normalizeCompanyQuery(value) {
@@ -173,11 +220,12 @@ function toKebabCase(value) {
 }
 
 // NEW: Targeted Company Search
-function buildCompanySearchUrl(source, company) {
+function buildCompanySearchUrl(source, company, location) {
   const encoded = encodeURIComponent(company);
   if (source === "linkedin") {
     // Same junior-only (f_E) + past-24h filters for targeted company search.
-    return `https://www.linkedin.com/jobs/search/?keywords=${encoded}&f_TPR=r86400&f_E=1%2C2%2C3&sortBy=DD`;
+    const geoParam = location ? `location=${encodeURIComponent(location)}` : `geoId=${DEFAULT_GEO_ID}`;
+    return `https://www.linkedin.com/jobs/search/?keywords=${encoded}&f_TPR=r86400&f_E=1%2C2%2C3&${geoParam}&sortBy=DD`;
   }
   if (source === "naukri") {
     const slug = toKebabCase(company) || "jobs";
@@ -198,7 +246,7 @@ function buildCompanySearchUrl(source, company) {
     return `https://hiring.cafe/?searchState=${encodeURIComponent(state)}`;
   }
   if (source === "indeed") {
-    return `https://in.indeed.com/jobs?q=${encoded}&l=India&fromage=1&explvl=entry_level&jt=fulltime&sort=date`;
+    return buildIndeedKeywordUrl(company, location);
   }
   // Apna has no keyword search that reliably scopes results (confirmed via
   // testing — most guessed URL/query patterns silently fall back to the
@@ -490,15 +538,32 @@ async function runScrapeTask(task) {
   const cfg = SCRAPE_SOURCES[source];
   if (!cfg) return { status: "failed", message: `Unknown source: ${source}` };
 
+  // This user's own profile — drives which search URLs we build below AND is
+  // handed to the content scripts (via window.__jhProfile) for in-page
+  // keyword/experience filtering, instead of one hardcoded resume/location.
+  const profile = await getUserProfile();
+
   // NEW: Targeted Company Search
   const companyQuery = normalizeCompanyQuery(task.company);
-  const companyUrl = companyQuery ? buildCompanySearchUrl(source, companyQuery) : null;
+  const companyUrl = companyQuery ? buildCompanySearchUrl(source, companyQuery, profile.location) : null;
 
-  // linkedin runs several separate keyword searches back-to-back instead of
-  // one URL (see LINKEDIN_KEYWORD_QUERIES) -- a single combined boolean-OR
-  // query returned noticeably fewer results than each search run on its own.
+  // linkedin/indeed run several separate keyword searches back-to-back
+  // instead of one URL -- a single combined boolean-OR query returned
+  // noticeably fewer results than each search run on its own. Keywords come
+  // from the user's own target_keywords/skills when set, else the defaults.
+  const userKeywords = [...profile.targetKeywords, ...profile.skills].filter(Boolean);
+  let sourceUrls = cfg.urls && cfg.urls.length ? cfg.urls : [cfg.url];
+  if (!companyUrl && userKeywords.length) {
+    if (source === "linkedin") sourceUrls = userKeywords.map((k) => buildLinkedinKeywordUrl(k, profile.location));
+    else if (source === "indeed") sourceUrls = userKeywords.map((k) => buildIndeedKeywordUrl(k, profile.location));
+    else if (source === "apna") sourceUrls = buildApnaUrls(userKeywords);
+  } else if (!companyUrl && profile.location) {
+    if (source === "linkedin") sourceUrls = DEFAULT_LINKEDIN_KEYWORD_QUERIES.map((k) => buildLinkedinKeywordUrl(k, profile.location));
+    else if (source === "indeed") sourceUrls = DEFAULT_INDEED_KEYWORD_QUERIES.map((k) => buildIndeedKeywordUrl(k, profile.location));
+  }
+
   // Targeted company search always overrides with its own single URL.
-  const targetUrls = companyUrl ? [companyUrl] : (cfg.urls && cfg.urls.length ? cfg.urls : [cfg.url]);
+  const targetUrls = companyUrl ? [companyUrl] : sourceUrls;
   const iterating = targetUrls.length > 1;
 
   const targetTab = await getOrCreateWorkerTab(`scrape_${source}`, targetUrls[0]);
@@ -525,6 +590,15 @@ async function runScrapeTask(task) {
     }
 
     try {
+      // Set window.__jhProfile in the tab's isolated world BEFORE job_match.js
+      // runs, so its profile-aware thresholds see the real values from the
+      // very first check (rather than racing an async storage/fetch read).
+      await new Promise((resolve) => {
+        chrome.scripting.executeScript(
+          { target: { tabId: targetTab.id }, func: (p) => { window.__jhProfile = p; }, args: [profile] },
+          () => resolve()
+        );
+      });
       await new Promise((resolve) => {
         chrome.scripting.executeScript(
           { target: { tabId: targetTab.id }, files: ["content/job_match.js", cfg.injectFile] },

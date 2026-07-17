@@ -89,13 +89,10 @@ def _log_feature_flags():
     logger.info("Gmail OAuth token exchange (send): %s (GOOGLE_CLIENT_SECRET)", state("GOOGLE_CLIENT_SECRET"))
     logger.info("OpenRouter AI fallback: %s (OPENROUTER_API_KEY)", state("OPENROUTER_API_KEY"))
     logger.info("Server Gemini key pool: %s (GEMINI_API_KEY)", state("GEMINI_API_KEY"))
-    if os.getenv("FIELD_ENCRYPTION_KEY"):
-        logger.info("Field encryption at rest: enabled (FIELD_ENCRYPTION_KEY)")
-    else:
-        logger.warning(
-            "Field encryption at rest: DISABLED — user secrets stored in PLAINTEXT. "
-            "Set FIELD_ENCRYPTION_KEY in production."
-        )
+    # Field encryption is a hard requirement (see services/crypto.py) — the
+    # process would already have failed to start without it, so reaching here
+    # means it's enabled.
+    logger.info("Field encryption at rest: enabled (FIELD_ENCRYPTION_KEY)")
 
 
 @asynccontextmanager

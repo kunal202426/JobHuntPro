@@ -4,11 +4,13 @@ import { getRows } from "../db/client.js";
 const router = Router();
 
 // requireAuth already verifies the JWT and sets req.userEmail (see middleware/auth.js).
-// Only Kunal's account can reach these routes; override via ADMIN_EMAIL env var if needed.
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "mathurkunal000@gmail.com";
+// No hardcoded fallback: an unset ADMIN_EMAIL means these routes are closed to
+// everyone, not silently granted to one specific person's address regardless
+// of who's actually running this deployment.
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL || null;
 
 function isAdmin(req) {
-  return req.userEmail === ADMIN_EMAIL;
+  return Boolean(ADMIN_EMAIL) && req.userEmail === ADMIN_EMAIL;
 }
 
 // GET /admin/users — summary of all users who have data in the LinkedIn DB

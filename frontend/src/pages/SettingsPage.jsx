@@ -27,6 +27,12 @@ const DEFAULT_FORM = {
   // AI context
   background_text: '',
   projects: ['', '', ''],
+  // Job search profile (drives extension scraping + job scoring — not tied to one resume/college/location)
+  college: '',
+  location: '',
+  experience_years: '',
+  target_keywords: '',
+  skills: '',
 }
 
 export default function SettingsPage() {
@@ -104,38 +110,56 @@ export default function SettingsPage() {
     onError: (err) => setGmailMsg(`Google error: ${err.error_description || err.error || 'unknown'}`),
   })
 
-  // Load existing profile
+  // Load existing profile — merges the cold backend's profile (Gmail/AI
+  // keys/email-drafting fields) with the linkedin backend's own copy of the
+  // job-search fields (college/location/skills/experience_years) it uses to
+  // score jobs and drive the extension's search URLs.
   useEffect(() => {
     if (!token) return
-    fetch(`${COLD_API}/auth/profile`, { headers: { Authorization: `Bearer ${token}` } })
-      .then(r => r.ok ? r.json() : null)
-      .then(data => {
-        if (!data) return
-        const projects = Array.isArray(data.projects) ? data.projects : []
-        while (projects.length < 3) projects.push('')
-        setGmailConnected(!!data.has_gmail_connected)
-        setHasGeminiKey(!!data.has_gemini_key)
-        setHasClaudeKey(!!data.has_claude_key)
-        setHasGmailPassword(!!data.has_gmail_password)
-        setForm(f => ({
-          ...f,
-          gmail_address: data.gmail_address || '',
-          full_name: data.full_name || '',
-          phone: data.phone || '',
-          portfolio_url: data.portfolio_url || '',
-          linkedin_url: data.linkedin_url || '',
-          current_role: data.current_role || '',
-          current_company: data.current_company || '',
-          graduation_month_year: data.graduation_month_year || '',
-          target_role: data.target_role || '',
-          background_text: data.background_text || '',
-          projects,
-          // Never pre-fill secrets
-          gmail_app_password: '',
-          gemini_api_key: '',
-          gemini_api_keys: '',
-          claude_api_key: '',
-        }))
+    Promise.all([
+      fetch(`${COLD_API}/auth/profile`, { headers: { Authorization: `Bearer ${token}` } })
+        .then(r => r.ok ? r.json() : null).catch(() => null),
+      fetch(`${LINKEDIN_API}/api/account/profile`, { headers: { Authorization: `Bearer ${token}` } })
+        .then(r => r.ok ? r.json() : null).catch(() => null),
+    ])
+      .then(([data, matchProfile]) => {
+        if (data) {
+          const projects = Array.isArray(data.projects) ? data.projects : []
+          while (projects.length < 3) projects.push('')
+          setGmailConnected(!!data.has_gmail_connected)
+          setHasGeminiKey(!!data.has_gemini_key)
+          setHasClaudeKey(!!data.has_claude_key)
+          setHasGmailPassword(!!data.has_gmail_password)
+          setForm(f => ({
+            ...f,
+            gmail_address: data.gmail_address || '',
+            full_name: data.full_name || '',
+            phone: data.phone || '',
+            portfolio_url: data.portfolio_url || '',
+            linkedin_url: data.linkedin_url || '',
+            current_role: data.current_role || '',
+            current_company: data.current_company || '',
+            graduation_month_year: data.graduation_month_year || '',
+            target_role: data.target_role || '',
+            background_text: data.background_text || '',
+            projects,
+            // Never pre-fill secrets
+            gmail_app_password: '',
+            gemini_api_key: '',
+            gemini_api_keys: '',
+            claude_api_key: '',
+          }))
+        }
+        if (matchProfile) {
+          setForm(f => ({
+            ...f,
+            college: matchProfile.college || '',
+            location: matchProfile.location || '',
+            experience_years: matchProfile.experience_years != null ? String(matchProfile.experience_years) : '',
+            target_keywords: Array.isArray(matchProfile.target_keywords) ? matchProfile.target_keywords.join(', ') : '',
+            skills: Array.isArray(matchProfile.skills) ? matchProfile.skills.join(', ') : '',
+          }))
+        }
       })
       .catch(() => {})
       .finally(() => setFetching(false))
@@ -192,13 +216,33 @@ export default function SettingsPage() {
       if (allGeminiKeys.length > 0) payload.gemini_api_keys = allGeminiKeys
       if (form.claude_api_key.trim()) payload.claude_api_key = form.claude_api_key.trim()
 
-      const res = await fetch(`${COLD_API}/auth/profile`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify(payload),
-      })
+      const matchPayload = {
+        full_name: form.full_name.trim(),
+        current_role: form.current_role.trim(),
+        target_role: form.target_role.trim(),
+        background_text: form.background_text.trim(),
+        college: form.college.trim(),
+        location: form.location.trim(),
+        experience_years: form.experience_years.trim(),
+        target_keywords: form.target_keywords.trim(),
+        skills: form.skills.trim(),
+      }
+
+      const [res, matchRes] = await Promise.all([
+        fetch(`${COLD_API}/auth/profile`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify(payload),
+        }),
+        fetch(`${LINKEDIN_API}/api/account/profile`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify(matchPayload),
+        }),
+      ])
       const data = await res.json()
       if (!res.ok) throw new Error(data.detail || 'Failed to save')
+      if (!matchRes.ok) throw new Error('Saved profile, but failed to save job-search settings (college/location/skills)')
 
       // Reflect newly-saved secrets in the "saved" indicators, then clear the
       // input boxes (we never keep secret values in the form after saving).
@@ -334,6 +378,40 @@ export default function SettingsPage() {
             <Input label="Current company" value={form.current_company} onChange={v => set('current_company', v)} placeholder="YES Bank" />
             <Input label="Availability / grad date" value={form.graduation_month_year} onChange={v => set('graduation_month_year', v)} placeholder="July 2026" />
             <Input label="What you're looking for" value={form.target_role} onChange={v => set('target_role', v)} placeholder="full-time SWE roles" />
+          </Section>
+
+          {/* ── Section: Job Search Profile ──────────────── */}
+          <Section title="Job Search Profile (drives job matching + the extension)">
+            <p style={{ color: '#9a8a7e', fontSize: 12, marginBottom: 12 }}>
+              Used to score scraped jobs and build the extension's search queries — so results match
+              your background, not a fixed profile. Leave blank to use sensible defaults.
+            </p>
+            <Input label="College / University" value={form.college} onChange={v => set('college', v)} placeholder="e.g. IIT Bombay" />
+            <Input label="Location" value={form.location} onChange={v => set('location', v)} placeholder="e.g. Bangalore, India" />
+            <Input label="Years of experience" type="number" value={form.experience_years} onChange={v => set('experience_years', v)} placeholder="e.g. 0" />
+            <label style={{ display: 'block', color: '#7a6a5e', fontSize: 12, marginBottom: 4 }}>
+              Target roles / keywords (comma separated)
+            </label>
+            <textarea
+              value={form.target_keywords}
+              onChange={e => set('target_keywords', e.target.value)}
+              placeholder="e.g. product manager, growth marketing, business analyst"
+              rows={2}
+              style={textareaStyle}
+            />
+            <p style={{ color: '#9a8a7e', fontSize: 11, margin: '6px 0 12px' }}>
+              What job titles you're searching for — replaces the default software-engineer keyword list.
+            </p>
+            <label style={{ display: 'block', color: '#7a6a5e', fontSize: 12, marginBottom: 4 }}>
+              Skills (comma separated)
+            </label>
+            <textarea
+              value={form.skills}
+              onChange={e => set('skills', e.target.value)}
+              placeholder="e.g. react, node, sql, figma, salesforce"
+              rows={2}
+              style={textareaStyle}
+            />
           </Section>
 
           {/* ── Section: Background ───────────────────────── */}
