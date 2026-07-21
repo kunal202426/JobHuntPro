@@ -125,5 +125,23 @@ window.__jhJobFilter = (function () {
     return /reposted/i.test(text || "");
   }
 
-  return { FRESH_DAYS, isExcludedTitle, tooMuchExperience, parsePostedAt, isFreshWithin, looksReposted, getResumeKeywords };
+  // LinkedIn's job-card title/company links often contain a visible label AND
+  // a visually-hidden accessibility span with the identical text (for screen
+  // readers) — .textContent on the anchor picks up both, concatenated with no
+  // separator ("Nest.js back-end developerNest.js back-end developer"). Collapse
+  // that back down to a single copy. No-op for any text that isn't doubled.
+  function collapseDoubledText(text) {
+    if (!text) return text;
+    const trimmed = String(text).trim();
+    const len = trimmed.length;
+    if (len > 1 && len % 2 === 0) {
+      const half = len / 2;
+      if (trimmed.slice(0, half) === trimmed.slice(half)) {
+        return trimmed.slice(0, half);
+      }
+    }
+    return trimmed;
+  }
+
+  return { FRESH_DAYS, isExcludedTitle, tooMuchExperience, parsePostedAt, isFreshWithin, looksReposted, getResumeKeywords, collapseDoubledText };
 })();

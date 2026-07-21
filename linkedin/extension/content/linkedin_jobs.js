@@ -67,10 +67,13 @@ function extractJobCard(card) {
       card.querySelector("h3 a") ||
       card.querySelector("h3");
 
-    const title =
+    const dedupe = (t) => (window.__jhJobFilter ? window.__jhJobFilter.collapseDoubledText(t) : t);
+
+    const title = dedupe(
       titleEl?.textContent?.trim() ||
       titleEl?.getAttribute("aria-label") ||
-      card.querySelector("h3")?.textContent?.trim();
+      card.querySelector("h3")?.textContent?.trim()
+    );
 
     if (!title || !isRelevant(title)) return null;
 
@@ -93,9 +96,10 @@ function extractJobCard(card) {
       card.querySelector(".artdeco-entity-lockup__subtitle") ||
       card.querySelector(".base-search-card__subtitle") ||
       card.querySelector("h4");
-    const company =
+    const company = dedupe(
       companyEl?.querySelector("span[dir='ltr']")?.textContent?.trim() ||
-      companyEl?.textContent?.trim();
+      companyEl?.textContent?.trim()
+    );
     if (!company) return null;
 
     // Location
@@ -105,7 +109,7 @@ function extractJobCard(card) {
       card.querySelector("[class*='workplace-type']") ||
       card.querySelector(".job-search-card__location") ||
       card.querySelector("[class*='location']");
-    const location = locationEl?.textContent?.trim() || null;
+    const location = dedupe(locationEl?.textContent?.trim()) || null;
 
     // Posted at — LinkedIn uses <time datetime="ISO"> or text like "2 hours ago"
     const timeEl =
