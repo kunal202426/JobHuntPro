@@ -460,6 +460,11 @@ export default function SettingsPage() {
             <ExtensionTutorial />
           </Section>
 
+          {/* ── Section: Autofill Extension ───────────────── */}
+          <Section title="Autofill Extension (fills out job applications)">
+            <AutofillExtensionTutorial />
+          </Section>
+
           {/* ── Section: Danger Zone ───────────────────────── */}
           <Section title="Danger Zone">
             <p style={{ color: '#9a8a7e', fontSize: 12, marginBottom: 12 }}>
@@ -586,6 +591,84 @@ function ExtensionTutorial() {
       <div style={{ background: 'rgba(168,120,48,0.08)', border: '1px solid rgba(168,120,48,0.25)', borderRadius: 6, padding: '10px 14px', marginTop: 16 }}>
         <p style={{ color: '#7a5a28', fontSize: 12, margin: 0, lineHeight: 1.6 }}>
           <strong>Note:</strong> The extension must stay installed for job scraping and auto-connect to work. Signing out pauses background work and clears the synced session until you open the dashboard or popup again.
+        </p>
+      </div>
+    </div>
+  )
+}
+
+function AutofillExtensionTutorial() {
+  return (
+    <div>
+      <p style={{ color: '#9a8a7e', fontSize: 12, marginBottom: 16 }}>
+        A separate extension that fills out the actual application form once you're on an ATS
+        portal (Greenhouse, Lever, Workday, and most others), and learns from every question
+        you answer manually — reworded versions of the same question get filled automatically
+        next time. It's local-first: your profile and everything it learns stay in your own
+        browser, not on our servers, and it doesn't share a login with JobHunt Engine — you
+        set up your own profile inside its popup after installing.{' '}
+        <a href="https://github.com/kunal202426/Simplify_Job" target="_blank" rel="noreferrer" style={{ color: '#c8845a' }}>
+          Source & details →
+        </a>
+      </p>
+
+      {/* Download button */}
+      <a
+        href="/autofill-extension.zip"
+        download="Autofill-extension.zip"
+        style={{
+          display: 'inline-flex', alignItems: 'center', gap: 8,
+          background: '#c8845a', borderRadius: 6, color: '#fff',
+          fontSize: 13, fontWeight: 600, padding: '8px 18px',
+          textDecoration: 'none', marginBottom: 20,
+        }}
+      >
+        Download Extension (.zip)
+      </a>
+
+      <div style={{ borderTop: '1px solid #d4ccc4', paddingTop: 16 }}>
+        <p style={{ color: '#7a6a5e', fontSize: 12, fontWeight: 600, marginBottom: 12 }}>Installation steps</p>
+
+        <Step n="1">
+          Download and <strong>extract</strong> the ZIP file above (right-click → Extract All, or use 7-Zip).
+        </Step>
+
+        <Step n="2">
+          Open Chrome and go to <Code>chrome://extensions</Code>
+        </Step>
+
+        <Step n="3">
+          Toggle <strong>Developer mode</strong> on (top-right corner of the extensions page).
+        </Step>
+
+        <Step n="4">
+          Click <strong>"Load unpacked"</strong> and select the folder you extracted in step 1.
+          You should see <strong>Autofill Jobs</strong> appear in your extensions list.
+        </Step>
+
+        <Step n="5">
+          <strong>Pin the extension</strong> to your toolbar — click the puzzle-piece icon in Chrome's toolbar, then pin it.
+        </Step>
+
+        <Step n="6">
+          <strong>Open the extension popup</strong> and fill in your profile — name, contact info,
+          education, resume, and so on. This is stored only in your browser, so it's a one-time
+          setup independent of your JobHuntPro account.
+        </Step>
+
+        <Step n="7">
+          <strong>Apply as usual</strong> — on any application form, the extension fills what it
+          can from your profile and flags the rest for you. Fields you fill in manually get
+          learned automatically, so the same or a reworded question is filled next time.
+        </Step>
+      </div>
+
+      <div style={{ background: 'rgba(168,120,48,0.08)', border: '1px solid rgba(168,120,48,0.25)', borderRadius: 6, padding: '10px 14px', marginTop: 16 }}>
+        <p style={{ color: '#7a5a28', fontSize: 12, margin: 0, lineHeight: 1.6 }}>
+          <strong>Note:</strong> It never auto-submits an application or auto-accepts a consent
+          checkbox — you always review and hit submit yourself. The download is larger than
+          JobHunt Engine's (~22MB) because it bundles a small local AI model for matching
+          reworded questions; that model runs fully offline, no data ever leaves your machine.
         </p>
       </div>
     </div>
