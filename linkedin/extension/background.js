@@ -76,8 +76,12 @@ const SCRAPE_SOURCES = {
     // departments + roleYoeRange [0,1] (junior) + sortBy date. The scraper then
     // only trims to the last 24h. Location = India via IP geo. SSR embeds jobs in
     // __NEXT_DATA__.
-    url: "https://hiring.cafe/?searchState=%7B%22searchQuery%22%3A%22Software+Engineer%22%2C%22dateFetchedPastNDays%22%3A2%2C%22departments%22%3A%5B%22Software+Development%22%2C%22Engineering%22%2C%22Information+Technology%22%2C%22Data+and+Analytics%22%5D%2C%22roleYoeRange%22%3A%5B0%2C1%5D%2C%22sortBy%22%3A%22date%22%7D",
-    hostPrefix: "https://hiring.cafe/",
+    // hiring.cafe now redirects to hiringcafe.com (confirmed live) — the extension
+    // has no host_permissions for wherever a tab redirects to, so the URL here
+    // must be the final domain or script injection silently fails and nothing
+    // gets scraped.
+    url: "https://hiringcafe.com/?searchState=%7B%22searchQuery%22%3A%22Software+Engineer%22%2C%22dateFetchedPastNDays%22%3A2%2C%22departments%22%3A%5B%22Software+Development%22%2C%22Engineering%22%2C%22Information+Technology%22%2C%22Data+and+Analytics%22%5D%2C%22roleYoeRange%22%3A%5B0%2C1%5D%2C%22sortBy%22%3A%22date%22%7D",
+    hostPrefix: "https://hiringcafe.com/",
     injectFile: "content/hiringcafe.js",
   },
   wellfound: {
@@ -243,7 +247,7 @@ function buildCompanySearchUrl(source, company, location) {
       roleYoeRange: [0, 1],
       sortBy: "date",
     });
-    return `https://hiring.cafe/?searchState=${encodeURIComponent(state)}`;
+    return `https://hiringcafe.com/?searchState=${encodeURIComponent(state)}`;
   }
   if (source === "indeed") {
     return buildIndeedKeywordUrl(company, location);
