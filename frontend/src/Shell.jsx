@@ -5,6 +5,7 @@ import JobHuntRoute from './routes/JobHuntRoute'
 import ColdRoute from './routes/ColdRoute'
 import LoginPage from './pages/LoginPage'
 import SettingsPage from './pages/SettingsPage'
+import ExtensionsPage from './pages/ExtensionsPage'
 import AdminPage from './pages/AdminPage'
 import HelpPage from './pages/HelpPage'
 import './Shell.css'
@@ -67,6 +68,13 @@ function WorkspaceShell() {
             style={{ fontSize: 12 }}
           >
             ? Help
+          </NavLink>
+          <NavLink
+            to="/extensions"
+            className={({ isActive }) => `shell-tab ${isActive ? 'shell-tab--active' : ''}`}
+            style={{ fontSize: 12 }}
+          >
+            🧩 Extensions
           </NavLink>
           <NavLink
             to="/settings"
@@ -139,6 +147,7 @@ export default function Shell() {
       <Route path="/login"    element={<LoginPage />} />
       <Route path="/register" element={<Navigate to="/login" replace />} />
       <Route path="/settings" element={<RequireLogin><SettingsPage /></RequireLogin>} />
+      <Route path="/extensions" element={<RequireLogin><ExtensionsPage /></RequireLogin>} />
       {/* Single WorkspaceShell for ALL authenticated routes.
           Separate /admin route removed — it created a second shell instance
           and wiped all state (filters, scroll) on every admin ↔ tab switch. */}

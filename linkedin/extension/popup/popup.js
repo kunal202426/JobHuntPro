@@ -124,6 +124,37 @@ if (logoutBtn) {
   });
 }
 
+// Master on/off switch — a manual pause independent of the queue's own run-state (which is
+// backend-authoritative and gets overwritten by syncRunState every 30s). This one is purely
+// local and stays put until the user flips it again, so it also works as a way to stop
+// background scraping/auto-connect entirely without signing out or removing the extension.
+const MASTER_ENABLED_KEY = "jh_master_enabled";
+
+function setMasterToggleUI(enabled) {
+  const btn = document.getElementById("master-toggle");
+  const label = document.getElementById("master-toggle-label");
+  if (!btn || !label) return;
+  btn.classList.toggle("master-toggle-off", !enabled);
+  label.textContent = enabled ? "Extension On" : "Extension Off";
+}
+
+function loadMasterToggle() {
+  chrome.storage.local.get([MASTER_ENABLED_KEY], (data) => {
+    setMasterToggleUI(data[MASTER_ENABLED_KEY] !== false);
+  });
+}
+
+const masterToggleBtn = document.getElementById("master-toggle");
+if (masterToggleBtn) {
+  masterToggleBtn.addEventListener("click", () => {
+    chrome.storage.local.get([MASTER_ENABLED_KEY], (data) => {
+      const next = data[MASTER_ENABLED_KEY] === false; // was off -> turning on, and vice versa
+      chrome.storage.local.set({ [MASTER_ENABLED_KEY]: next }, () => setMasterToggleUI(next));
+    });
+  });
+}
+loadMasterToggle();
+
 function loadStats() {
   chrome.runtime.sendMessage({ type: "GET_DAILY_STATS" }, (res) => {
     const todayEl = document.getElementById("connections-today");

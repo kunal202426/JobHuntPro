@@ -13,7 +13,7 @@ export default function HelpPage() {
         <Section title="The Full Flow" accent="#c8845a">
           <Flow steps={[
             { n: '1', label: 'Sign up & fill Settings', sub: 'Name, Gmail, profile details, API keys' },
-            { n: '2', label: 'Install Chrome Extension', sub: 'Download from Settings → Chrome Extension section' },
+            { n: '2', label: 'Install Chrome Extension(s)', sub: 'Download from the Extensions page' },
             { n: '3', label: 'Scrape jobs from LinkedIn', sub: 'Visit LinkedIn Jobs — extension captures listings automatically' },
             { n: '4', label: 'Find HR contacts', sub: 'Click "Find Leads" on any job card in JobHunt tab' },
             { n: '5', label: 'Auto-send connection requests', sub: 'Lead Connector tab handles LinkedIn connects in the background' },
@@ -104,7 +104,7 @@ export default function HelpPage() {
             The extension must stay installed and Chrome must stay open for auto-connect to run. It does not need a separate login — it picks up your session automatically when you visit the app.
           </Note>
           <p style={{ ...bodyText, marginTop: 16 }}>
-            Install steps: Settings → Chrome Extension section → Download Extension → extract the ZIP → Chrome <code style={code}>chrome://extensions</code> → Developer mode ON → Load unpacked → select the folder.
+            Install steps: Extensions page → Download Extension → extract the ZIP → Chrome <code style={code}>chrome://extensions</code> → Developer mode ON → Load unpacked → select the folder.
           </p>
         </Section>
 

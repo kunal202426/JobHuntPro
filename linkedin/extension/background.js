@@ -294,15 +294,21 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 
   if (message.type === "TRIGGER_CONNECT") {
-    chrome.storage.local.set({ connect_running: message.running });
-    sendResponse({ ok: true });
+    isMasterEnabled().then((enabled) => {
+      if (!enabled) return sendResponse({ ok: false, error: "Extension is turned off" });
+      chrome.storage.local.set({ connect_running: message.running });
+      sendResponse({ ok: true });
+    });
+    return true; // async
   }
 
   if (message.type === "TRIGGER_CONNECT_NOW") {
     // Dashboard clicked Start Queue / Retry — kick the loop immediately instead
     // of waiting for the 30s alarm.
-    hasActiveSession()
-      .then(async (active) => {
+    isMasterEnabled()
+      .then(async (masterEnabled) => {
+        if (!masterEnabled) return sendResponse({ ok: false, error: "Extension is turned off" });
+        const active = await hasActiveSession();
         if (!active) return sendResponse({ ok: false, error: "Session inactive" });
         await syncRunState();
         if (!_connectLoopRunning) {
@@ -358,8 +364,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 
   if (message.type === "TRIGGER_SCRAPE_NOW") {
-    hasActiveSession()
-      .then((active) => {
+    isMasterEnabled()
+      .then(async (masterEnabled) => {
+        if (!masterEnabled) return sendResponse({ ok: false, error: "Extension is turned off" });
+        const active = await hasActiveSession();
         if (!active) return sendResponse({ ok: false, error: "Session inactive" });
         processPendingScrapeTasks().catch(() => {});
         sendResponse({ ok: true });
@@ -374,6 +382,8 @@ let _connectLoopRunning = false;
 
 chrome.alarms.onAlarm.addListener(async (alarm) => {
   if (alarm.name !== "connect_tick") return;
+
+  if (!(await isMasterEnabled())) return;
 
   if (!(await hasActiveSession())) {
     await deactivateSession();
@@ -392,6 +402,7 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
 
 // Runs one LinkedIn connect attempt; returns "done", "no_item", "stopped", "limit_hit", or "captcha"
 async function processOneConnection() {
+  if (!(await isMasterEnabled())) return "stopped";
   if (!(await hasActiveSession())) return "stopped";
   const connections_today = await ensureDailyReset();
   const { connect_running } = await chrome.storage.local.get("connect_running");
@@ -698,6 +709,15 @@ async function hasActiveSession() {
   // correctly deactivates everything.
   const syncData = await chrome.storage.sync.get("jh_token");
   return Boolean(syncData.jh_token);
+}
+
+// Purely local, purely manual — the popup's master on/off switch. Independent of
+// hasActiveSession() (auth) and connect_running (the backend-authoritative queue state,
+// re-synced every 30s): this one only exists to let the user pause everything without
+// signing out or uninstalling, and nothing else ever writes to it.
+async function isMasterEnabled() {
+  const data = await chrome.storage.local.get("jh_master_enabled");
+  return data.jh_master_enabled !== false;
 }
 
 async function deactivateSession() {

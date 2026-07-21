@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { useGoogleLogin } from '@react-oauth/google'
 
 const COLD_API = import.meta.env.VITE_COLD_API_URL || 'http://localhost:8000'
@@ -455,14 +455,24 @@ export default function SettingsPage() {
             )}
           </Section>
 
-          {/* ── Section: Chrome Extension ─────────────────── */}
-          <Section title="Chrome Extension (LinkedIn scraping + auto-connect)">
-            <ExtensionTutorial />
-          </Section>
-
-          {/* ── Section: Autofill Extension ───────────────── */}
-          <Section title="Autofill Extension (fills out job applications)">
-            <AutofillExtensionTutorial />
+          {/* ── Section: Extensions ────────────────────────── */}
+          <Section title="Chrome Extensions">
+            <p style={{ color: '#9a8a7e', fontSize: 12, marginBottom: 12 }}>
+              Two separate installs: JobHunt Engine (LinkedIn scraping + auto-connect) and the
+              Autofill extension (fills out application forms). Downloads and step-by-step
+              install instructions for both moved to their own page.
+            </p>
+            <Link
+              to="/extensions"
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 8,
+                background: '#c8845a', borderRadius: 6, color: '#fff',
+                fontSize: 13, fontWeight: 600, padding: '8px 18px',
+                textDecoration: 'none',
+              }}
+            >
+              Go to Extensions →
+            </Link>
           </Section>
 
           {/* ── Section: Danger Zone ───────────────────────── */}
@@ -498,178 +508,6 @@ export default function SettingsPage() {
             </button>
           </div>
         </form>
-      </div>
-    </div>
-  )
-}
-
-// ── Extension tutorial ────────────────────────────────────────────────────────
-
-function Step({ n, children }) {
-  return (
-    <div style={{ display: 'flex', gap: 12, marginBottom: 14, alignItems: 'flex-start' }}>
-      <span style={{
-        flexShrink: 0, width: 24, height: 24, borderRadius: '50%',
-        background: '#c8845a', color: '#fff', fontSize: 12, fontWeight: 700,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-      }}>{n}</span>
-      <div style={{ color: '#4a3728', fontSize: 13, lineHeight: 1.6 }}>{children}</div>
-    </div>
-  )
-}
-
-function Code({ children }) {
-  return (
-    <code style={{ background: '#ede8e2', border: '1px solid #d4ccc4', borderRadius: 4, padding: '1px 6px', fontSize: 12, color: '#7a4a28' }}>
-      {children}
-    </code>
-  )
-}
-
-function ExtensionTutorial() {
-  return (
-    <div>
-      <p style={{ color: '#9a8a7e', fontSize: 12, marginBottom: 16 }}>
-        The Chrome extension lets you scrape jobs from LinkedIn, Naukri, CutShort &amp; InstaHyre, find HR contacts, and auto-send connection requests — all synced to your dashboard.
-      </p>
-
-      {/* Download button */}
-      <a
-        href="/extension.zip"
-        download="JobHuntEngine-extension.zip"
-        style={{
-          display: 'inline-flex', alignItems: 'center', gap: 8,
-          background: '#c8845a', borderRadius: 6, color: '#fff',
-          fontSize: 13, fontWeight: 600, padding: '8px 18px',
-          textDecoration: 'none', marginBottom: 20,
-        }}
-      >
-        Download Extension (.zip)
-      </a>
-
-      <div style={{ borderTop: '1px solid #d4ccc4', paddingTop: 16 }}>
-        <p style={{ color: '#7a6a5e', fontSize: 12, fontWeight: 600, marginBottom: 12 }}>Installation steps</p>
-
-        <Step n="1">
-          Download and <strong>extract</strong> the ZIP file above (right-click → Extract All, or use 7-Zip).
-        </Step>
-
-        <Step n="2">
-          Open Chrome and go to <Code>chrome://extensions</Code>
-        </Step>
-
-        <Step n="3">
-          Toggle <strong>Developer mode</strong> on (top-right corner of the extensions page).
-        </Step>
-
-        <Step n="4">
-          Click <strong>"Load unpacked"</strong> and select the folder you extracted in step 1.
-          You should see <strong>JobHunt Engine</strong> appear in your extensions list.
-        </Step>
-
-        <Step n="5">
-          <strong>Pin the extension</strong> to your toolbar — click the puzzle-piece icon in Chrome's toolbar, then pin JobHunt Engine.
-        </Step>
-
-        <Step n="6">
-          <strong>Open the dashboard once after logging in</strong> — that syncs your session to the extension. You can also open the extension popup to refresh the session if needed.
-        </Step>
-
-        <Step n="7">
-          <strong>Scrape jobs:</strong> In the JobHunt tab, choose a source and click <strong>Scrape</strong>. The extension opens that portal in the background and sends matching jobs to your dashboard.
-        </Step>
-
-        <Step n="8">
-          <strong>Find HR contacts:</strong> In the Jobs tab on your dashboard, click "Find Leads" on any job — the extension opens LinkedIn People Search and scrapes HR profiles.
-        </Step>
-
-        <Step n="9">
-          <strong>Auto-connect:</strong> In the Leads tab, queue people for LinkedIn connection requests. The extension sends up to your daily limit automatically in the background.
-        </Step>
-      </div>
-
-      <div style={{ background: 'rgba(168,120,48,0.08)', border: '1px solid rgba(168,120,48,0.25)', borderRadius: 6, padding: '10px 14px', marginTop: 16 }}>
-        <p style={{ color: '#7a5a28', fontSize: 12, margin: 0, lineHeight: 1.6 }}>
-          <strong>Note:</strong> The extension must stay installed for job scraping and auto-connect to work. Signing out pauses background work and clears the synced session until you open the dashboard or popup again.
-        </p>
-      </div>
-    </div>
-  )
-}
-
-function AutofillExtensionTutorial() {
-  return (
-    <div>
-      <p style={{ color: '#9a8a7e', fontSize: 12, marginBottom: 16 }}>
-        A separate extension that fills out the actual application form once you're on an ATS
-        portal (Greenhouse, Lever, Workday, and most others), and learns from every question
-        you answer manually — reworded versions of the same question get filled automatically
-        next time. It's local-first: your profile and everything it learns stay in your own
-        browser, not on our servers, and it doesn't share a login with JobHunt Engine — you
-        set up your own profile inside its popup after installing.{' '}
-        <a href="https://github.com/kunal202426/Simplify_Job" target="_blank" rel="noreferrer" style={{ color: '#c8845a' }}>
-          Source & details →
-        </a>
-      </p>
-
-      {/* Download button */}
-      <a
-        href="/autofill-extension.zip"
-        download="Autofill-extension.zip"
-        style={{
-          display: 'inline-flex', alignItems: 'center', gap: 8,
-          background: '#c8845a', borderRadius: 6, color: '#fff',
-          fontSize: 13, fontWeight: 600, padding: '8px 18px',
-          textDecoration: 'none', marginBottom: 20,
-        }}
-      >
-        Download Extension (.zip)
-      </a>
-
-      <div style={{ borderTop: '1px solid #d4ccc4', paddingTop: 16 }}>
-        <p style={{ color: '#7a6a5e', fontSize: 12, fontWeight: 600, marginBottom: 12 }}>Installation steps</p>
-
-        <Step n="1">
-          Download and <strong>extract</strong> the ZIP file above (right-click → Extract All, or use 7-Zip).
-        </Step>
-
-        <Step n="2">
-          Open Chrome and go to <Code>chrome://extensions</Code>
-        </Step>
-
-        <Step n="3">
-          Toggle <strong>Developer mode</strong> on (top-right corner of the extensions page).
-        </Step>
-
-        <Step n="4">
-          Click <strong>"Load unpacked"</strong> and select the folder you extracted in step 1.
-          You should see <strong>Autofill Jobs</strong> appear in your extensions list.
-        </Step>
-
-        <Step n="5">
-          <strong>Pin the extension</strong> to your toolbar — click the puzzle-piece icon in Chrome's toolbar, then pin it.
-        </Step>
-
-        <Step n="6">
-          <strong>Open the extension popup</strong> and fill in your profile — name, contact info,
-          education, resume, and so on. This is stored only in your browser, so it's a one-time
-          setup independent of your JobHuntPro account.
-        </Step>
-
-        <Step n="7">
-          <strong>Apply as usual</strong> — on any application form, the extension fills what it
-          can from your profile and flags the rest for you. Fields you fill in manually get
-          learned automatically, so the same or a reworded question is filled next time.
-        </Step>
-      </div>
-
-      <div style={{ background: 'rgba(168,120,48,0.08)', border: '1px solid rgba(168,120,48,0.25)', borderRadius: 6, padding: '10px 14px', marginTop: 16 }}>
-        <p style={{ color: '#7a5a28', fontSize: 12, margin: 0, lineHeight: 1.6 }}>
-          <strong>Note:</strong> It never auto-submits an application or auto-accepts a consent
-          checkbox — you always review and hit submit yourself. The download is larger than
-          JobHunt Engine's (~22MB) because it bundles a small local AI model for matching
-          reworded questions; that model runs fully offline, no data ever leaves your machine.
-        </p>
       </div>
     </div>
   )
