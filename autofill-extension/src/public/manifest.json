@@ -1,0 +1,41 @@
+{
+  "name": "Autofill Jobs",
+  "version": "1.0.0",
+  "manifest_version": 3,
+  "description": "Fills in annoying job forms for you, with data from your resume & more.",
+  "action": {},
+  "side_panel": {
+    "default_path": "index.html"
+  },
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "icons": {
+    "16": "icons/16.png",
+    "48": "icons/48.png",
+    "128": "icons/128.png"
+  },
+  "permissions": ["storage", "sidePanel"],
+  "host_permissions": ["http://localhost:11434/*", "http://127.0.0.1:11434/*"],
+  "content_scripts": [
+    {
+      "js": [
+        "contentScripts/utils.js",
+        "contentScripts/signature.js",
+        "contentScripts/learningStore.js",
+        "contentScripts/formatConvert.js",
+        "contentScripts/matcher.js",
+        "contentScripts/embedding.js",
+        "contentScripts/reviewPanel.js",
+        "contentScripts/engine.js",
+        "contentScripts/workday.js",
+        "contentScripts/autofill.js"
+      ],
+      "matches": ["https://*/*"],
+      "all_frames": true,
+      "world": "ISOLATED",
+      "run_at": "document_end"
+    }
+  ]
+}
