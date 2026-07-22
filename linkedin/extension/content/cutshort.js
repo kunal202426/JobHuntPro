@@ -34,6 +34,62 @@ function detectIsStartup(card) {
   return false;
 }
 
+// Preferred: explicit company link/class hooks (works whenever Cutshort's markup
+// includes them). Falls back to the plain-text "at <Company>" row Cutshort renders for
+// agency/anonymous postings ("via HyrHub", "Leading provider of...") — these have no
+// link and no distinguishing class, so the selectors above never catch them, and a job
+// with no company was previously dropped outright.
+function extractCompanyName(card, titleEl) {
+  const el =
+    card.querySelector("[class*='company'] a") ||
+    card.querySelector("[class*='company-name']") ||
+    card.querySelector("[class*='companyName']") ||
+    card.querySelector("a[href*='/company/']") ||
+    card.querySelector("[class*='employer']");
+  const linked = el?.textContent?.trim();
+  if (linked) return linked;
+
+  const titleRow = titleEl?.closest("h2, h3")?.parentElement;
+  const companyRow = titleRow?.nextElementSibling;
+  const raw = companyRow?.querySelector("span")?.textContent || companyRow?.textContent;
+  const name = raw?.replace(/^\s*at\s+/i, "").trim();
+  return name || null;
+}
+
+// Cutshort's current build gives job cards styled-components hash classes (e.g.
+// "sc-61a153a7-0 jEsvIv") with no "job" substring anywhere, so the class-based
+// selectors in scrapeAllCards() can legitimately match zero cards on a live page. This
+// finds the repeated card structure directly from the job title links instead, which
+// survives styling/class-hash changes since it doesn't depend on class names at all.
+function findCardsByStructure() {
+  const anchors = Array.from(document.querySelectorAll("a[href*='/job/']"));
+  if (anchors.length === 0) return [];
+
+  function ancestors(el) {
+    const chain = [];
+    let cur = el;
+    while (cur && cur !== document.body) {
+      chain.push(cur);
+      cur = cur.parentElement;
+    }
+    return chain;
+  }
+
+  if (anchors.length === 1) {
+    const card = anchors[0].closest("article") || anchors[0].parentElement?.parentElement;
+    return card ? [card] : [];
+  }
+
+  const chainA = ancestors(anchors[0]);
+  const chainB = new Set(ancestors(anchors[1]));
+  const listContainer = chainA.find((el) => chainB.has(el));
+  if (!listContainer) return [];
+
+  return Array.from(listContainer.children).filter((child) =>
+    child.querySelector("a[href*='/job/']")
+  );
+}
+
 function extractJobCard(card) {
   try {
     // Title
@@ -63,13 +119,7 @@ function extractJobCard(card) {
     jobUrl = jobUrl.split("?")[0];
 
     // Company
-    const companyEl =
-      card.querySelector("[class*='company'] a") ||
-      card.querySelector("[class*='company-name']") ||
-      card.querySelector("[class*='companyName']") ||
-      card.querySelector("a[href*='/company/']") ||
-      card.querySelector("[class*='employer']");
-    const company = companyEl?.textContent?.trim();
+    const company = extractCompanyName(card, titleEl);
     if (!company) return null;
 
     // Location
@@ -150,7 +200,11 @@ function scrapeAllCards() {
   }
 
   if (cards.length === 0) {
-    console.log("[Cutshort] No job cards found with known selectors");
+    cards = findCardsByStructure();
+  }
+
+  if (cards.length === 0) {
+    console.log("[Cutshort] No job cards found with known selectors or structural fallback");
     return [];
   }
 
