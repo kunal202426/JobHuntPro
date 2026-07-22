@@ -2,6 +2,7 @@
   "name": "Autofill Jobs",
   "version": "1.0.0",
   "manifest_version": 3,
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAizY2cC8R5h7cY3rTc9Sn6qQBumSv1vzLBLhOhG7C/GhtYKr6nkPaKIqb14rmvZhEKAw2LidJ2/B0BG0t3Kxm67v74z42V5DJoCfdZzqCGv7OOuwmPskS6SS7/vrDTtgRu6wGRhsJrgLjiOEV3XnvcD+CrUcRXxZTxyoT8mNXgSTg5cIoKb3uEt3unqUyEVpiecfjWbfrLeT6tZwN+0xky0wtogPT8JCPZ053oPE8StR4Z1Si5T2qXl3yAejnlVsg+0xxfVGysXhCaOL7MLGE72grTmON0bW5FyMmzL4V9hw5KN+C4G6pX1RSSAPuXk/wwe3VDZu4/u2sIN35hFVtqQIDAQAB",
   "description": "Fills in annoying job forms for you, with data from your resume & more.",
   "action": {},
   "side_panel": {
